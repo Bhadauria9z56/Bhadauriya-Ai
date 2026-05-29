@@ -20,7 +20,7 @@
       --user-bg:    #1b3a1b;
       --bot-bg:     #0f1f0f;
       --border:     rgba(76, 175, 80, 0.15);
-      --trunk-color: #8B6F47;
+      --tree-trunk: #8B6F47;
       --foliage-1:  #4caf50;
       --foliage-2:  #66bb6a;
       --code-bg:    rgba(76, 175, 80, 0.15);
@@ -423,6 +423,14 @@
       color: #ef5350 !important;
     }
 
+    /* Inline code styling */
+    code {
+      background: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
     /* ── Responsive ── */
     @media (max-width: 768px) {
       .messages {
@@ -457,7 +465,7 @@
       <div class="logo-icon">
         <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
           <!-- Trunk -->
-          <rect x="40" y="65" width="20" height="40" fill="var(--trunk-color)"/>
+          <rect x="40" y="65" width="20" height="40" fill="var(--tree-trunk)"/>
           <!-- Foliage layers (3 triangles like a pine tree) -->
           <polygon points="50,20 20,50 80,50" fill="var(--foliage-1)"/>
           <polygon points="50,40 15,75 85,75" fill="var(--foliage-2)"/>
@@ -482,7 +490,7 @@
         <div class="welcome-icon">
           <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
             <!-- Trunk -->
-            <rect x="40" y="65" width="20" height="40" fill="var(--trunk-color)"/>
+            <rect x="40" y="65" width="20" height="40" fill="var(--tree-trunk)"/>
             <!-- Foliage layers (3 triangles like a pine tree) -->
             <polygon points="50,20 20,50 80,50" fill="var(--foliage-1)"/>
             <polygon points="50,40 15,75 85,75" fill="var(--foliage-2)"/>
@@ -517,7 +525,7 @@
 
 <script>
   // ── Theme Colors ──────────────────────────────────────────────
-  // Note: These values must match the CSS variables --trunk-color, --foliage-1, --foliage-2
+  // Note: These values must match the CSS variables --tree-trunk, --foliage-1, --foliage-2
   const COLORS = {
     trunk: '#8B6F47',
     foliage1: '#4caf50',
@@ -652,7 +660,7 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\n/g, '<br>');
   }
 
