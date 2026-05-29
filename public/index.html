@@ -20,6 +20,7 @@
       --user-bg:    #1b3a1b;
       --bot-bg:     #0f1f0f;
       --border:     rgba(76, 175, 80, 0.15);
+      --trunk-color: #8B6F47;
       --font-head:  'Syne', sans-serif;
       --font-mono:  'JetBrains Mono', monospace;
     }
@@ -453,7 +454,7 @@
       <div class="logo-icon">
         <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
           <!-- Trunk -->
-          <rect x="40" y="65" width="20" height="40" fill="currentColor" style="color: #8B6F47;"/>
+          <rect x="40" y="65" width="20" height="40" fill="var(--trunk-color)"/>
           <!-- Foliage layers (3 triangles like a pine tree) -->
           <polygon points="50,20 20,50 80,50" fill="currentColor" style="color: #4caf50;"/>
           <polygon points="50,40 15,75 85,75" fill="currentColor" style="color: #66bb6a;"/>
@@ -478,7 +479,7 @@
         <div class="welcome-icon">
           <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
             <!-- Trunk -->
-            <rect x="40" y="65" width="20" height="40" fill="currentColor" style="color: #8B6F47;"/>
+            <rect x="40" y="65" width="20" height="40" fill="var(--trunk-color)"/>
             <!-- Foliage layers (3 triangles like a pine tree) -->
             <polygon points="50,20 20,50 80,50" fill="currentColor" style="color: #4caf50;"/>
             <polygon points="50,40 15,75 85,75" fill="currentColor" style="color: #66bb6a;"/>
@@ -596,7 +597,7 @@
   // ── Add message bubble ────────────────────────────────────────
   function addMessage(role, text, isError = false) {
     const container = document.getElementById('messages');
-    const now = new Date().toLocaleTimeString('en-US', {
+    const now = new Date().toLocaleTimeString('en-IN', {
       hour: '2-digit', minute: '2-digit'
     });
 
@@ -671,11 +672,11 @@
         <div class="welcome-icon">
           <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
             <!-- Trunk -->
-            <rect x="40" y="65" width="20" height="40" fill="currentColor" style="color: #8B6F47;"/>
+            <rect x="40" y="65" width="20" height="40" fill="#8B6F47"/>
             <!-- Foliage layers (3 triangles like a pine tree) -->
-            <polygon points="50,20 20,50 80,50" fill="currentColor" style="color: #4caf50;"/>
-            <polygon points="50,40 15,75 85,75" fill="currentColor" style="color: #66bb6a;"/>
-            <polygon points="50,60 10,100 90,100" fill="currentColor" style="color: #4caf50;"/>
+            <polygon points="50,20 20,50 80,50" fill="#4caf50"/>
+            <polygon points="50,40 15,75 85,75" fill="#66bb6a"/>
+            <polygon points="50,60 10,100 90,100" fill="#4caf50"/>
           </svg>
         </div>
         <h2>Bhadauriya AI</h2>
