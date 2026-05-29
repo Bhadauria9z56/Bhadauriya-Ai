@@ -515,6 +515,23 @@
 </div>
 
 <script>
+  // ── Theme Colors ──────────────────────────────────────────────
+  const COLORS = {
+    trunk: '#8B6F47',
+    foliage1: '#4caf50',
+    foliage2: '#66bb6a'
+  };
+
+  // ── Tree SVG Template ──────────────────────────────────────────
+  const treeSvg = `
+    <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
+      <rect x="40" y="65" width="20" height="40" fill="${COLORS.trunk}"/>
+      <polygon points="50,20 20,50 80,50" fill="${COLORS.foliage1}"/>
+      <polygon points="50,40 15,75 85,75" fill="${COLORS.foliage2}"/>
+      <polygon points="50,60 10,100 90,100" fill="${COLORS.foliage1}"/>
+    </svg>
+  `;
+
   let sessionId = null;
   let messageCount = 0;
   let isLoading = false;
@@ -607,10 +624,11 @@
     div.className = `message ${role}`;
 
     const avatar = role === 'bot' ? '🌲' : '👤';
+    const avatarLabel = role === 'bot' ? 'Bhadauriya AI Assistant' : 'You';
     const errorClass = isError ? ' error-bubble' : '';
 
     div.innerHTML = `
-      <div class="avatar ${role}">${avatar}</div>
+      <div class="avatar ${role}" aria-label="${avatarLabel}">${avatar}</div>
       <div>
         <div class="bubble${errorClass}">${formatText(text)}</div>
         <div class="message-meta">${now}</div>
@@ -640,9 +658,9 @@
     div.className = 'message bot';
     div.id = id;
     div.innerHTML = `
-      <div class="avatar bot">🌲</div>
+      <div class="avatar bot" aria-label="Bhadauriya AI Assistant">🌲</div>
       <div class="bubble">
-        <div class="typing-indicator">
+        <div class="typing-indicator" aria-label="Assistant is typing">
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
           <div class="typing-dot"></div>
@@ -672,14 +690,7 @@
     container.innerHTML = `
       <div class="welcome" id="welcomeScreen">
         <div class="welcome-icon">
-          <svg viewBox="0 0 100 120" xmlns="http://www.w3.org/2000/svg">
-            <!-- Trunk -->
-            <rect x="40" y="65" width="20" height="40" fill="#8B6F47"/>
-            <!-- Foliage layers (3 triangles like a pine tree) -->
-            <polygon points="50,20 20,50 80,50" fill="#4caf50"/>
-            <polygon points="50,40 15,75 85,75" fill="#66bb6a"/>
-            <polygon points="50,60 10,100 90,100" fill="#4caf50"/>
-          </svg>
+          ${treeSvg}
         </div>
         <h2>Bhadauriya AI</h2>
         <p>Start a new conversation. Ask anything in Hindi or English.</p>
