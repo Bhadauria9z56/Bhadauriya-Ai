@@ -23,6 +23,7 @@
       --trunk-color: #8B6F47;
       --foliage-1:  #4caf50;
       --foliage-2:  #66bb6a;
+      --code-bg:    rgba(76, 175, 80, 0.15);
       --font-head:  'Syne', sans-serif;
       --font-mono:  'JetBrains Mono', monospace;
     }
@@ -516,10 +517,16 @@
 
 <script>
   // ── Theme Colors ──────────────────────────────────────────────
+  // Note: These values must match the CSS variables --trunk-color, --foliage-1, --foliage-2
   const COLORS = {
     trunk: '#8B6F47',
     foliage1: '#4caf50',
     foliage2: '#66bb6a'
+  };
+
+  const AVATARS = {
+    bot: '🌲',
+    user: '👤'
   };
 
   // ── Tree SVG Template ──────────────────────────────────────────
@@ -623,7 +630,7 @@
     const div = document.createElement('div');
     div.className = `message ${role}`;
 
-    const avatar = role === 'bot' ? '🌲' : '👤';
+    const avatar = role === 'bot' ? AVATARS.bot : AVATARS.user;
     const avatarLabel = role === 'bot' ? 'Bhadauriya AI Assistant' : 'You';
     const errorClass = isError ? ' error-bubble' : '';
 
@@ -645,7 +652,7 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code style="background:rgba(76,175,80,0.15);padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>')
+      .replace(/`([^`]+)`/g, '<code style="background:var(--code-bg);padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>')
       .replace(/\n/g, '<br>');
   }
 
@@ -658,7 +665,7 @@
     div.className = 'message bot';
     div.id = id;
     div.innerHTML = `
-      <div class="avatar bot" aria-label="Bhadauriya AI Assistant">🌲</div>
+      <div class="avatar bot" aria-label="Bhadauriya AI Assistant">${AVATARS.bot}</div>
       <div class="bubble">
         <div class="typing-indicator" aria-label="Assistant is typing">
           <div class="typing-dot"></div>
