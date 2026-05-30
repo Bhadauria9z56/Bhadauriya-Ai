@@ -398,6 +398,162 @@
             animation: pulse 1s infinite;
         }
 
+        .input-button.voice-chat {
+            color: var(--primary);
+        }
+
+        /* VOICE CHAT MODAL */
+        .voice-chat-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .voice-chat-modal.active {
+            display: flex;
+        }
+
+        .voice-chat-header {
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .voice-chat-status {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            height: 20px;
+        }
+
+        .voice-chat-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* ANIMATED WAVEFORM */
+        .waveform-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 60px;
+            margin: 24px 0;
+        }
+
+        .waveform-bar {
+            width: 4px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 2px;
+            animation: waveform 0.8s ease-in-out infinite;
+        }
+
+        .waveform-bar:nth-child(1) { animation-delay: -0.4s; }
+        .waveform-bar:nth-child(2) { animation-delay: -0.3s; }
+        .waveform-bar:nth-child(3) { animation-delay: -0.2s; }
+        .waveform-bar:nth-child(4) { animation-delay: -0.1s; }
+        .waveform-bar:nth-child(5) { animation-delay: 0s; }
+
+        .waveform-container.thinking .waveform-bar {
+            background: var(--text-secondary);
+        }
+
+        .waveform-container.speaking .waveform-bar {
+            background: #ff9800;
+        }
+
+        @keyframes waveform {
+            0%, 100% { height: 20px; }
+            50% { height: 50px; }
+        }
+
+        /* TRANSCRIPT AREAS */
+        .voice-chat-content {
+            width: 100%;
+            max-width: 600px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            padding: 0 24px;
+            overflow-y: auto;
+        }
+
+        .transcript-section {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        .transcript-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .transcript-text {
+            font-size: 15px;
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 20px;
+        }
+
+        .transcript-text.empty {
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* VOICE CHAT CONTROLS */
+        .voice-chat-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .voice-chat-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: none;
+            background: var(--primary);
+            color: #000;
+            cursor: pointer;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            font-weight: bold;
+        }
+
+        .voice-chat-btn:hover {
+            background: var(--primary-dark);
+            transform: scale(1.05);
+        }
+
+        .voice-chat-btn.end-call {
+            background: #ff4444;
+            color: white;
+        }
+
+        .voice-chat-btn.end-call:hover {
+            background: #cc0000;
+        }
+
         /* SCROLLBAR */
         ::-webkit-scrollbar {
             width: 8px;
@@ -561,6 +717,9 @@
                     <button class="input-button" title="Voice Input">
                         🎤
                     </button>
+                    <button class="input-button voice-chat" title="Voice Chat" aria-label="Start voice chat with AI">
+                        ☎️
+                    </button>
                     <button class="input-button send" title="Send">
                         ➤
                     </button>
@@ -580,16 +739,70 @@
         </div>
     </div>
 
+    <!-- VOICE CHAT MODAL -->
+    <div class="voice-chat-modal" id="voice-chat-modal">
+        <div class="voice-chat-header">
+            <div class="voice-chat-status" id="voice-chat-status">Connecting...</div>
+            <div class="voice-chat-title">Voice Chat</div>
+        </div>
+
+        <div class="waveform-container" id="waveform-container">
+            <div class="waveform-bar"></div>
+            <div class="waveform-bar"></div>
+            <div class="waveform-bar"></div>
+            <div class="waveform-bar"></div>
+            <div class="waveform-bar"></div>
+        </div>
+
+        <div class="voice-chat-content">
+            <div class="transcript-section">
+                <div class="transcript-label">You said:</div>
+                <div class="transcript-text empty" id="user-transcript">Listening...</div>
+            </div>
+
+            <div class="transcript-section">
+                <div class="transcript-label">Bhadauriya AI:</div>
+                <div class="transcript-text empty" id="ai-transcript">Waiting for your voice...</div>
+            </div>
+        </div>
+
+        <div class="voice-chat-controls">
+            <button class="voice-chat-btn end-call" id="end-call-btn" title="End Call">✕</button>
+        </div>
+    </div>
+
     <script>
         // Constants and State
         const API_BASE = '/api';
         const PREVIEW_MAX_LENGTH = 50;
         const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
+        const VOICE_CHAT_ERROR_RECOVERY_DELAY = 1500; // Milliseconds before resuming listening after error
+        const SPEECH_SYNTHESIS_RATE = 1;
+        const SPEECH_SYNTHESIS_PITCH = 1;
+        const SPEECH_SYNTHESIS_VOLUME = 1;
+
+        // Error message mapping for voice chat
+        const VOICE_CHAT_ERROR_MESSAGES = {
+            'not-allowed': 'Microphone access denied. Please grant microphone permissions.',
+            'network': 'Network error. Please check your connection.',
+            'no-speech': 'No speech detected. Please try speaking again.',
+            'audio-capture': 'No microphone found. Please check your device.',
+            'permission-denied': 'Microphone permission denied. Please allow access in browser settings.',
+            'default': 'An error occurred. Please try again.'
+        };
+
         let sessionId = null;
         let currentChatId = null;
         let isListening = false;
         let selectedImages = [];
         let selectedDocuments = [];
+
+        // Voice Chat State
+        let voiceChatActive = false;
+        let voiceChatRecognition = null;
+        let voiceChatSynthesis = window.speechSynthesis;
+        let isSpeaking = false;
+        let awaitingUserInput = false;
 
         // DOM Elements
         const messagesWrapper = document.querySelector('.messages-wrapper');
@@ -597,12 +810,21 @@
         const attachImageBtn = document.querySelectorAll('.input-button')[0];
         const attachDocBtn = document.querySelectorAll('.input-button')[1];
         const voiceBtn = document.querySelectorAll('.input-button')[2];
-        const sendBtn = document.querySelectorAll('.input-button')[3];
+        const voiceChatBtn = document.querySelectorAll('.input-button')[3];
+        const sendBtn = document.querySelectorAll('.input-button')[4];
         const newChatBtn = document.querySelector('.new-chat-btn');
         const chatHistory = document.querySelector('.chat-history');
         const attachmentPreview = document.querySelector('.attachment-preview');
         const imageModal = document.getElementById('image-modal');
         const imageModalClose = imageModal.querySelector('.modal-close');
+
+        // Voice Chat Modal Elements
+        const voiceChatModal = document.getElementById('voice-chat-modal');
+        const voiceChatStatus = document.getElementById('voice-chat-status');
+        const waveformContainer = document.getElementById('waveform-container');
+        const userTranscript = document.getElementById('user-transcript');
+        const aiTranscript = document.getElementById('ai-transcript');
+        const endCallBtn = document.getElementById('end-call-btn');
 
         // Initialize
         async function init() {
@@ -613,6 +835,13 @@
             loadChatHistory();
             createHiddenFileInputs();
             setupEventListeners();
+            
+            // Preload voices for speech synthesis
+            if (voiceChatSynthesis) {
+                voiceChatSynthesis.onvoiceschanged = () => {
+                    // Voices loaded, ensures they are available for speech synthesis
+                };
+            }
         }
 
         function setupEventListeners() {
@@ -635,6 +864,8 @@
             attachImageBtn.addEventListener('click', () => document.getElementById('image-input').click());
             attachDocBtn.addEventListener('click', () => document.getElementById('doc-input').click());
             voiceBtn.addEventListener('click', startVoiceInput);
+            voiceChatBtn.addEventListener('click', startVoiceChat);
+            endCallBtn.addEventListener('click', endVoiceChat);
             newChatBtn.addEventListener('click', newChat);
 
             // Modal
@@ -801,6 +1032,7 @@
 
                 const data = await response.json();
                 displayMessage('bot', { text: data.reply });
+
                 saveChat(message, images, documents);
             } catch (error) {
                 displayMessage('bot', { text: `Error: ${error.message}` });
@@ -932,6 +1164,301 @@
             };
 
             recognition.start();
+        }
+
+        // ─── VOICE CHAT FUNCTIONS ───────────────────────────────────────────────
+
+        function startVoiceChat() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                displayMessage('bot', { text: '❌ Voice Chat is not supported in this browser. Please use Chrome or Edge.' });
+                return;
+            }
+
+            if (!voiceChatSynthesis) {
+                displayMessage('bot', { text: '❌ Text-to-Speech is not supported in this browser.' });
+                return;
+            }
+
+            voiceChatActive = true;
+            voiceChatModal.classList.add('active');
+            updateVoiceChatStatus('Listening...');
+            updateWaveformState('listening');
+
+            // Reset transcripts
+            userTranscript.textContent = 'Listening...';
+            userTranscript.classList.add('empty');
+            aiTranscript.textContent = 'Waiting for your voice...';
+            aiTranscript.classList.add('empty');
+
+            startVoiceChatListening();
+        }
+
+        function startVoiceChatListening() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            voiceChatRecognition = new SpeechRecognition();
+            voiceChatRecognition.continuous = true;
+            voiceChatRecognition.interimResults = true;
+            voiceChatRecognition.lang = 'en-US';
+
+            // finalTranscript persists within this recognition session to accumulate text from multiple
+            // onresult events. It's reset each time startVoiceChatListening() is called (new session).
+            let finalTranscript = '';
+
+            voiceChatRecognition.onstart = () => {
+                updateVoiceChatStatus('Listening...');
+                updateWaveformState('listening');
+                awaitingUserInput = true;
+            };
+
+            voiceChatRecognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                // Display interim or final transcript
+                const displayText = (finalTranscript + interimTranscript).trim();
+                if (displayText) {
+                    userTranscript.textContent = displayText;
+                    userTranscript.classList.remove('empty');
+                }
+            };
+
+            voiceChatRecognition.onend = async () => {
+                if (!voiceChatActive) return;
+
+                const trimmedTranscript = finalTranscript.trim();
+                if (trimmedTranscript) {
+                    // Send the message
+                    updateVoiceChatStatus('Thinking...');
+                    updateWaveformState('thinking');
+                    await sendVoiceChatMessage(trimmedTranscript);
+                } else {
+                    // No speech detected, resume listening
+                    startVoiceChatListening();
+                }
+            };
+
+            voiceChatRecognition.onerror = (event) => {
+                console.error('Voice chat recognition error:', event.error);
+                if (voiceChatActive) {
+                    // Only show error and recover for non-'no-speech' errors
+                    const isRecoverableError = event.error !== 'no-speech';
+                    
+                    if (isRecoverableError) {
+                        const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
+                        updateVoiceChatStatus(`Error: ${userMessage}`);
+                        
+                        // Automatically recover from error by resuming listening after a delay
+                        setTimeout(() => {
+                            if (voiceChatActive) {
+                                startVoiceChatListening();
+                            }
+                        }, VOICE_CHAT_ERROR_RECOVERY_DELAY);
+                    }
+                }
+            };
+
+            voiceChatRecognition.start();
+        }
+
+        async function sendVoiceChatMessage(message) {
+            if (!message.trim()) return;
+
+            // Update UI
+            userTranscript.textContent = message;
+            updateVoiceChatStatus('Thinking...');
+            updateWaveformState('thinking');
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message.trim(),
+                        sessionId: currentChatId,
+                        images: [],
+                        documents: []
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    displayMessage('bot', { text: `Error: ${error.error}` });
+                    aiTranscript.textContent = 'Error occurred. Try again.';
+                    aiTranscript.classList.remove('empty');
+                    
+                    // Resume listening after error
+                    if (voiceChatActive) {
+                        setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY);
+                    }
+                    return;
+                }
+
+                const data = await response.json();
+                const reply = data.reply;
+
+                // Display in main chat
+                displayMessage('user', { message });
+                displayMessage('bot', { text: reply });
+
+                // Update voice chat transcript
+                aiTranscript.textContent = reply;
+                aiTranscript.classList.remove('empty');
+
+                // Speak the response
+                if (voiceChatActive) {
+                    await speakResponse(reply);
+                    
+                    // Resume listening after speaking
+                    if (voiceChatActive) {
+                        startVoiceChatListening();
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                displayMessage('bot', { text: `Error: ${error.message}` });
+                aiTranscript.textContent = 'Error occurred. Try again.';
+                aiTranscript.classList.remove('empty');
+
+                // Resume listening after error
+                if (voiceChatActive) {
+                    setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY);
+                }
+            }
+        }
+
+        function stripMarkdown(text) {
+            // Remove markdown symbols - process bold (**) and strong (__) before italic (* and _)
+            // to avoid conflicts where **bold** would leave * characters after removing **
+            text = text.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove bold (**)
+            text = text.replace(/__(.*?)__/g, '$1'); // Remove bold (__)
+            text = text.replace(/\*(.*?)\*/g, '$1'); // Remove italic (*)
+            // For underscores, use word boundaries to handle _word_ at any position
+            text = text.replace(/\b_(.*?)_\b/g, '$1'); // Remove italic (_) with word boundaries
+            text = text.replace(/~~(.*?)~~/g, '$1'); // Remove strikethrough
+            text = text.replace(/`(.*?)`/g, '$1'); // Remove inline code
+            text = text.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
+            text = text.replace(/#+\s?(.*?)(?:\n|$)/g, '$1'); // Remove headings
+            text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1'); // Remove links
+            text = text.replace(/>\s?(.*?)(?:\n|$)/g, '$1'); // Remove blockquotes
+            return text.trim();
+        }
+
+        async function speakResponse(text) {
+            return new Promise((resolve) => {
+                // Cancel any ongoing speech
+                voiceChatSynthesis.cancel();
+
+                // Strip markdown from the text
+                const cleanText = stripMarkdown(text);
+
+                // Stop listening while speaking
+                if (voiceChatRecognition) {
+                    voiceChatRecognition.abort();
+                    // Don't set to null immediately: the onend/onerror handlers may still be pending
+                    // and could throw errors if the object is nullified before they execute
+                }
+
+                updateVoiceChatStatus('Speaking...');
+                updateWaveformState('speaking');
+                isSpeaking = true;
+
+                const utterance = new SpeechSynthesisUtterance(cleanText);
+                utterance.rate = SPEECH_SYNTHESIS_RATE;
+                utterance.pitch = SPEECH_SYNTHESIS_PITCH;
+                utterance.volume = SPEECH_SYNTHESIS_VOLUME;
+                utterance.lang = 'en-US';
+
+                // Try to use a natural voice - attempt multiple fallback options
+                const voices = voiceChatSynthesis.getVoices();
+                if (voices.length > 0) {
+                    // Select voice with preference order: Google > first English > first available
+                    let selectedVoice = null;
+                    let englishVoice = null;
+                    
+                    for (const voice of voices) {
+                        if (voice.name.includes('Google') && voice.lang.startsWith('en')) {
+                            selectedVoice = voice;
+                            break; // Highest priority, stop searching
+                        }
+                        if (!englishVoice && voice.lang.startsWith('en')) {
+                            englishVoice = voice; // Remember first English voice for fallback
+                        }
+                    }
+                    
+                    // Use best match or fallbacks in order
+                    if (!selectedVoice && englishVoice) {
+                        selectedVoice = englishVoice;
+                    }
+                    if (!selectedVoice && voices.length > 0) {
+                        selectedVoice = voices[0]; // Last resort: use first available
+                    }
+                    
+                    if (selectedVoice) {
+                        utterance.voice = selectedVoice;
+                    }
+                }
+
+                utterance.onend = () => {
+                    isSpeaking = false;
+                    resolve();
+                };
+
+                utterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event.error);
+                    isSpeaking = false;
+                    resolve();
+                };
+
+                voiceChatSynthesis.speak(utterance);
+            });
+        }
+
+        function updateVoiceChatStatus(status) {
+            voiceChatStatus.textContent = status;
+        }
+
+        function updateWaveformState(state) {
+            waveformContainer.classList.remove('listening', 'thinking', 'speaking');
+            if (state === 'listening') {
+                waveformContainer.classList.add('listening');
+            } else if (state === 'thinking') {
+                waveformContainer.classList.add('thinking');
+            } else if (state === 'speaking') {
+                waveformContainer.classList.add('speaking');
+            }
+        }
+
+        function endVoiceChat() {
+            voiceChatActive = false;
+
+            // Stop recognition
+            if (voiceChatRecognition) {
+                voiceChatRecognition.abort();
+                voiceChatRecognition = null;
+            }
+
+            // Cancel speech
+            voiceChatSynthesis.cancel();
+            isSpeaking = false;
+
+            // Hide modal
+            voiceChatModal.classList.remove('active');
+
+            // Reset state
+            updateVoiceChatStatus('Connecting...');
+            updateWaveformState('listening');
+            userTranscript.textContent = 'Listening...';
+            userTranscript.classList.add('empty');
+            aiTranscript.textContent = 'Waiting for your voice...';
+            aiTranscript.classList.add('empty');
         }
 
         function newChat() {
