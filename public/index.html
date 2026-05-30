@@ -776,6 +776,21 @@
         const API_BASE = '/api';
         const PREVIEW_MAX_LENGTH = 50;
         const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
+        const ERROR_RECOVERY_DELAY_MS = 1500; // Delay before resuming listening after error
+        const SPEECH_SYNTHESIS_RATE = 1;
+        const SPEECH_SYNTHESIS_PITCH = 1;
+        const SPEECH_SYNTHESIS_VOLUME = 1;
+
+        // Error message mapping for voice chat
+        const VOICE_CHAT_ERROR_MESSAGES = {
+            'not-allowed': 'Microphone access denied. Please grant microphone permissions.',
+            'network': 'Network error. Please check your connection.',
+            'no-speech': 'No speech detected. Please try speaking again.',
+            'audio-capture': 'No microphone found. Please check your device.',
+            'permission-denied': 'Microphone permission denied. Please allow access in browser settings.',
+            'default': 'An error occurred. Please try again.'
+        };
+
         let sessionId = null;
         let currentChatId = null;
         let isListening = false;
@@ -1180,7 +1195,7 @@
         function startVoiceChatListening() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             voiceChatRecognition = new SpeechRecognition();
-            voiceChatRecognition.continuous = false;
+            voiceChatRecognition.continuous = true;
             voiceChatRecognition.interimResults = true;
             voiceChatRecognition.lang = 'en-US';
 
@@ -1228,7 +1243,8 @@
             voiceChatRecognition.onerror = (event) => {
                 console.error('Voice chat recognition error:', event.error);
                 if (voiceChatActive && event.error !== 'no-speech') {
-                    updateVoiceChatStatus(`Error: ${event.error}`);
+                    const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
+                    updateVoiceChatStatus(`Error: ${userMessage}`);
                 }
             };
 
@@ -1263,7 +1279,7 @@
                     
                     // Resume listening after error
                     if (voiceChatActive) {
-                        setTimeout(() => startVoiceChatListening(), 1500);
+                        setTimeout(() => startVoiceChatListening(), ERROR_RECOVERY_DELAY_MS);
                     }
                     return;
                 }
@@ -1296,7 +1312,7 @@
 
                 // Resume listening after error
                 if (voiceChatActive) {
-                    setTimeout(() => startVoiceChatListening(), 1500);
+                    setTimeout(() => startVoiceChatListening(), ERROR_RECOVERY_DELAY_MS);
                 }
             }
         }
@@ -1334,19 +1350,24 @@
                 currentlySpeaking = true;
 
                 const utterance = new SpeechSynthesisUtterance(cleanText);
-                utterance.rate = 1;
-                utterance.pitch = 1;
-                utterance.volume = 1;
+                utterance.rate = SPEECH_SYNTHESIS_RATE;
+                utterance.pitch = SPEECH_SYNTHESIS_PITCH;
+                utterance.volume = SPEECH_SYNTHESIS_VOLUME;
                 utterance.lang = 'en-US';
 
-                // Try to use a natural voice
+                // Try to use a natural voice - attempt multiple fallback options
                 const voices = voiceChatSynthesis.getVoices();
-                const preferredVoice = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
-                                     voices.find(v => v.lang.startsWith('en') && v.default) ||
-                                     voices.find(v => v.lang.startsWith('en'));
-                
-                if (preferredVoice) {
-                    utterance.voice = preferredVoice;
+                if (voices.length > 0) {
+                    // Preference order: Google voices > system default English > first English voice > first available
+                    const preferredVoice = 
+                        voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
+                        voices.find(v => v.lang.startsWith('en') && v.default) ||
+                        voices.find(v => v.lang.startsWith('en')) ||
+                        voices[0];
+                    
+                    if (preferredVoice) {
+                        utterance.voice = preferredVoice;
+                    }
                 }
 
                 utterance.onend = () => {
@@ -1403,6 +1424,8 @@
             aiTranscript.textContent = 'Waiting for your voice...';
             aiTranscript.classList.add('empty');
         }
+
+        function newChat() {
             messagesWrapper.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">💬</div>
