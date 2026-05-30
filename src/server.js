@@ -110,43 +110,89 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     // Groq ke liye messages array banao
-    const groqMessages = [
-      { role: 'system', content: SYSTEM_PROMPT },
-      ...session.history.map(h => ({
-        role: h.role === 'model' ? 'assistant' : 'user',
-        content: h.parts.map(p => p.text).join('\n')
-      }))
-    ];
+    let groqMessages;
+    let modelToUse = GROQ_MODEL;
 
-    // Current message build karo
-    const messageParts = [];
-
-    if (message && message.trim()) {
-      messageParts.push({ text: message.trim() });
-    }
-
+    // Check if images are present for vision analysis
     if (images && images.length > 0) {
-      messageParts.push({ text: `[User sent ${images.length} image(s) - image analysis not supported in text mode]` });
-    }
-
-    if (documents && documents.length > 0) {
-      for (const doc of documents) {
-        if (doc.content) {
-          messageParts.push({ text: `[Document: ${doc.name || 'Unnamed'}]\n${doc.content}` });
+      // Use vision model for image analysis
+      modelToUse = 'meta-llama/llama-4-scout-17b-16e-instruct';
+      
+      groqMessages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...session.history.map(h => ({
+          role: h.role === 'model' ? 'assistant' : 'user',
+          content: h.parts.map(p => p.text).join('\n')
+        }))
+      ];
+      
+      // Build content array with text and images
+      const content = [
+        { type: 'text', text: message || 'Describe this image' }
+      ];
+      
+      // Add images as base64
+      images.forEach(img => {
+        const imageData = img.data.split(',').pop(); // Extract base64 from data URL if present
+        content.push({
+          type: 'image_url',
+          image_url: { url: `data:${img.mimeType};base64,${imageData}` }
+        });
+      });
+      
+      // Add documents if any
+      if (documents && documents.length > 0) {
+        let docText = '';
+        for (const doc of documents) {
+          if (doc.content) {
+            docText += `[Document: ${doc.name || 'Unnamed'}]\n${doc.content}\n\n`;
+          }
+        }
+        if (docText) {
+          content[0].text += '\n\n' + docText;
         }
       }
-    }
+      
+      groqMessages.push({
+        role: 'user',
+        content: content
+      });
+    } else {
+      // Original logic for text/documents only
+      groqMessages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...session.history.map(h => ({
+          role: h.role === 'model' ? 'assistant' : 'user',
+          content: h.parts.map(p => p.text).join('\n')
+        }))
+      ];
 
-    if (messageParts.length === 0) {
-      return res.status(400).json({ error: 'No valid content to send' });
-    }
+      // Current message build karo
+      const messageParts = [];
 
-    const currentContent = messageParts.map(p => p.text).join('\n');
-    groqMessages.push({ role: 'user', content: currentContent });
+      if (message && message.trim()) {
+        messageParts.push({ text: message.trim() });
+      }
+
+      if (documents && documents.length > 0) {
+        for (const doc of documents) {
+          if (doc.content) {
+            messageParts.push({ text: `[Document: ${doc.name || 'Unnamed'}]\n${doc.content}` });
+          }
+        }
+      }
+
+      if (messageParts.length === 0) {
+        return res.status(400).json({ error: 'No valid content to send' });
+      }
+
+      const currentContent = messageParts.map(p => p.text).join('\n');
+      groqMessages.push({ role: 'user', content: currentContent });
+    }
 
     const completion = await groq.chat.completions.create({
       messages: groqMessages,
-      model: GROQ_MODEL,
+      model: modelToUse,
       max_tokens: 2048,
       temperature: 0.7,
     });

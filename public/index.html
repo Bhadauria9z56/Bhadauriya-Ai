@@ -1003,7 +1003,7 @@
         <div class="sidebar-footer">
             <div class="sidebar-model-badge">
                 <span class="model-dot"></span>
-                <span id="model-badge-text">Gemini 2.0 Flash</span>
+                <span id="model-badge-text">Bhadauriya AI</span>
             </div>
         </div>
     </aside>
@@ -1192,7 +1192,7 @@
             const statsRes = await fetch(`${API_BASE}/stats`);
             const stats = await statsRes.json();
             if (stats.model) {
-                document.getElementById('model-badge-text').textContent = stats.model;
+                document.getElementById('model-badge-text').textContent = 'Bhadauriya AI';
             }
         } catch (_) {}
 
@@ -1238,7 +1238,7 @@
         document.body.appendChild(imgInput);
 
         const docInput = Object.assign(document.createElement('input'), {
-            type: 'file', id: 'doc-input', accept: '.txt,.md', multiple: true
+            type: 'file', id: 'doc-input', accept: '.pdf,.txt,.doc,.docx', multiple: true
         });
         docInput.style.display = 'none';
         docInput.addEventListener('change', handleDocSelect);
@@ -1263,9 +1263,29 @@
                 resolve(); return;
             }
             const reader = new FileReader();
-            reader.onload = () => { selectedDocs.push({ content: reader.result, name: file.name }); resolve(); };
             reader.onerror = () => resolve();
-            reader.readAsText(file);
+            
+            // Handle PDF files as base64, others as text
+            if (file.type === 'application/pdf') {
+                reader.onload = () => {
+                    // Convert ArrayBuffer to base64
+                    const bytes = new Uint8Array(reader.result);
+                    let binary = '';
+                    for (let i = 0; i < bytes.byteLength; i++) {
+                        binary += String.fromCharCode(bytes[i]);
+                    }
+                    const base64 = btoa(binary);
+                    selectedDocs.push({ content: base64, name: file.name });
+                    resolve();
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.onload = () => { 
+                    selectedDocs.push({ content: reader.result, name: file.name }); 
+                    resolve(); 
+                };
+                reader.readAsText(file);
+            }
         }))).then(() => { updateAttachPreview(); e.target.value = ''; });
     }
 
