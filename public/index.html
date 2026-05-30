@@ -717,7 +717,7 @@
                     <button class="input-button" title="Voice Input">
                         🎤
                     </button>
-                    <button class="input-button voice-chat" title="Voice Chat">
+                    <button class="input-button voice-chat" title="Voice Chat" aria-label="Start voice chat with AI">
                         ☎️
                     </button>
                     <button class="input-button send" title="Send">
@@ -839,7 +839,7 @@
             // Preload voices for speech synthesis
             if (voiceChatSynthesis) {
                 voiceChatSynthesis.onvoiceschanged = () => {
-                    // Voices loaded, no action needed but makes sure they're available
+                    // Voices loaded, ensures they are available for speech synthesis
                 };
             }
         }
@@ -1250,16 +1250,20 @@
 
             voiceChatRecognition.onerror = (event) => {
                 console.error('Voice chat recognition error:', event.error);
-                if (voiceChatActive && event.error !== 'no-speech') {
-                    const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
-                    updateVoiceChatStatus(`Error: ${userMessage}`);
+                if (voiceChatActive) {
+                    if (event.error !== 'no-speech') {
+                        const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
+                        updateVoiceChatStatus(`Error: ${userMessage}`);
+                    }
                     
                     // Automatically recover from error by resuming listening after a delay
-                    setTimeout(() => {
-                        if (voiceChatActive) {
-                            startVoiceChatListening();
-                        }
-                    }, VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
+                    if (event.error !== 'no-speech') {
+                        setTimeout(() => {
+                            if (voiceChatActive) {
+                                startVoiceChatListening();
+                            }
+                        }, VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
+                    }
                 }
             };
 
@@ -1333,11 +1337,12 @@
         }
 
         function stripMarkdown(text) {
-            // Remove bold, italic, code, strikethrough, headings, and other markdown
-            text = text.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove bold
-            text = text.replace(/__(.*?)__/g, '$1'); // Remove bold (underscore)
-            text = text.replace(/\*(.*?)\*/g, '$1'); // Remove italic
-            text = text.replace(/_(.*?)_/g, '$1'); // Remove italic (underscore)
+            // Remove markdown symbols - process bold (**) and strong (__) before italic (* and _)
+            // to avoid conflicts where **bold** would leave * characters after removing **
+            text = text.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove bold (**)
+            text = text.replace(/__(.*?)__/g, '$1'); // Remove bold (__)
+            text = text.replace(/\*(.*?)\*/g, '$1'); // Remove italic (*)
+            text = text.replace(/_(.*?)_/g, '$1'); // Remove italic (_)
             text = text.replace(/~~(.*?)~~/g, '$1'); // Remove strikethrough
             text = text.replace(/`(.*?)`/g, '$1'); // Remove inline code
             text = text.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
@@ -1358,7 +1363,7 @@
                 // Stop listening while speaking
                 if (voiceChatRecognition) {
                     voiceChatRecognition.abort();
-                    voiceChatRecognition = null;
+                    // Don't set to null immediately to avoid issues with pending callbacks
                 }
 
                 updateVoiceChatStatus('Speaking...');
@@ -1373,23 +1378,18 @@
 
                 // Try to use a natural voice - attempt multiple fallback options
                 // Voices may load asynchronously, so we check available voices
-                const getPreferredVoice = () => {
-                    const voices = voiceChatSynthesis.getVoices();
-                    if (voices.length === 0) {
-                        return null; // No voices available yet
-                    }
+                const voices = voiceChatSynthesis.getVoices();
+                if (voices.length > 0) {
                     // Preference order: Google voices > system default English > first English voice > first available
-                    return (
+                    const preferredVoice = 
                         voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
                         voices.find(v => v.lang.startsWith('en') && v.default) ||
                         voices.find(v => v.lang.startsWith('en')) ||
-                        voices[0]
-                    );
-                };
-                
-                const preferredVoice = getPreferredVoice();
-                if (preferredVoice) {
-                    utterance.voice = preferredVoice;
+                        voices[0];
+                    
+                    if (preferredVoice) {
+                        utterance.voice = preferredVoice;
+                    }
                 }
 
                 utterance.onend = () => {
