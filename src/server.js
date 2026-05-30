@@ -18,7 +18,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 // Gemini AI setup
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-// In-memory session store (Railway ephemeral storage ke liye theek hai)
+// In-memory session store
 const sessions = new Map();
 
 // Session cleanup - 30 min baad purane sessions delete
@@ -35,13 +35,17 @@ setInterval(() => {
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT ||
   'You are Bhadauriya AI, a helpful, intelligent and friendly assistant. Always respond in the same language the user writes in.';
 
-//  Routes
+// Model to use - configurable via env
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
-// Health check (Railway ke liye zaroori)
+// Routes
+
+// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     bot: process.env.BOT_NAME || 'Bhadauriya AI',
+    model: GEMINI_MODEL,
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -63,11 +67,7 @@ app.post('/api/session', (req, res) => {
 // Constants
 const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
 
-// Chat endpoint - now with file support
-// Request format: { message: string, sessionId: string, images: Array<{data, mimeType}>, documents: Array<{content, name}> }
-// Note: sessionId is the unique identifier for a chat conversation
-// Images should be base64-encoded data URLs
-// Documents should be text content (PDF, Word, etc. are not supported - use TXT or MD)
+// Chat endpoint
 app.post('/api/chat', async (req, res) => {
   const { message, sessionId, images = [], documents = [], history = [] } = req.body;
 
@@ -77,7 +77,7 @@ app.post('/api/chat', async (req, res) => {
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY set nahi hai' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY set nahi hai. Please configure the API key.' });
   }
 
   // Validate document sizes
@@ -111,14 +111,14 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash',
+      model: GEMINI_MODEL,
       systemInstruction: SYSTEM_PROMPT
     });
 
     const chat = model.startChat({
       history: session.history,
       generationConfig: {
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
         temperature: 0.7,
       }
     });
@@ -135,7 +135,6 @@ app.post('/api/chat', async (req, res) => {
     if (images && images.length > 0) {
       for (const img of images) {
         if (img.data && img.mimeType) {
-          // Extract base64 data (remove data:image/... prefix if present)
           let base64Data = img.data;
           if (base64Data.includes(',')) {
             base64Data = base64Data.split(',')[1];
@@ -181,7 +180,7 @@ app.post('/api/chat', async (req, res) => {
       userHistoryParts.push({ text: `[User sent ${documents.length} document(s)]` });
     }
 
-    // History update karo (userHistoryParts guaranteed to have content due to validation above)
+    // History update karo
     session.history.push(
       { role: 'user', parts: userHistoryParts },
       { role: 'model', parts: [{ text: responseText }] }
@@ -201,17 +200,19 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     console.error('Gemini API Error:', error.message);
 
-    if (error.message?.includes('API_KEY_INVALID')) {
-      return res.status(401).json({ error: 'Gemini API key invalid hai. .env check karo.' });
+    if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key')) {
+      return res.status(401).json({ error: 'Gemini API key invalid hai. Please check your .env file.' });
     }
-    if (error.message?.includes('QUOTA_EXCEEDED')) {
-      return res.status(429).json({ error: 'API quota khatam ho gaya. Thodi der baad try karo.' });
+    if (error.message?.includes('QUOTA_EXCEEDED') || error.message?.includes('quota')) {
+      return res.status(429).json({ error: 'API quota exceeded. Please try again later.' });
+    }
+    if (error.message?.includes('not found') || error.message?.includes('404')) {
+      return res.status(500).json({ error: `Model "${GEMINI_MODEL}" not found. Please check GEMINI_MODEL in .env` });
     }
 
-    res.status(500).json({ error: 'Kuch gadbad ho gayi. Dobara try karo.' });
+    res.status(500).json({ error: `Server error: ${error.message}` });
   }
 });
-
 
 function normalizeClientHistory(history) {
   if (!Array.isArray(history)) return [];
@@ -224,14 +225,15 @@ function normalizeClientHistory(history) {
       parts: [{ text: item.text.trim() }]
     }));
 }
+
 // Clear session history
 app.delete('/api/session/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   if (sessions.has(sessionId)) {
     sessions.delete(sessionId);
-    res.json({ success: true, message: 'Session clear ho gaya' });
+    res.json({ success: true, message: 'Session cleared' });
   } else {
-    res.json({ success: true, message: 'Session already nahi tha' });
+    res.json({ success: true, message: 'Session not found' });
   }
 });
 
@@ -240,7 +242,8 @@ app.get('/api/stats', (req, res) => {
   res.json({
     activeSessions: sessions.size,
     uptime: Math.floor(process.uptime()),
-    botName: process.env.BOT_NAME || 'Bhadauriya AI'
+    botName: process.env.BOT_NAME || 'Bhadauriya AI',
+    model: GEMINI_MODEL
   });
 });
 
@@ -251,5 +254,5 @@ app.get('*', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Bhadauriya AI Chatbot running on port ${PORT}`);
+  console.log(`✅ Bhadauriya AI running on port ${PORT} | Model: ${GEMINI_MODEL}`);
 });
