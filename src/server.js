@@ -141,8 +141,8 @@ app.post('/api/chat', async (req, res) => {
             base64Data = base64Data.split(',')[1];
           }
           messageParts.push({
-            inline_data: {
-              mime_type: img.mimeType,
+            inlineData: {
+              mimeType: img.mimeType,
               data: base64Data
             }
           });
