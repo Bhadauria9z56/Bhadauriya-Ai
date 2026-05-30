@@ -776,7 +776,7 @@
         const API_BASE = '/api';
         const PREVIEW_MAX_LENGTH = 50;
         const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
-        const ERROR_RECOVERY_DELAY_MS = 1500; // Delay before resuming listening after error
+        const VOICE_CHAT_ERROR_RECOVERY_DELAY_MS = 1500; // Delay before resuming listening after error
         const SPEECH_SYNTHESIS_RATE = 1;
         const SPEECH_SYNTHESIS_PITCH = 1;
         const SPEECH_SYNTHESIS_VOLUME = 1;
@@ -835,6 +835,13 @@
             loadChatHistory();
             createHiddenFileInputs();
             setupEventListeners();
+            
+            // Preload voices for speech synthesis
+            if (voiceChatSynthesis) {
+                voiceChatSynthesis.onvoiceschanged = () => {
+                    // Voices loaded, no action needed but makes sure they're available
+                };
+            }
         }
 
         function setupEventListeners() {
@@ -1199,7 +1206,7 @@
             voiceChatRecognition.interimResults = true;
             voiceChatRecognition.lang = 'en-US';
 
-            let finalTranscript = '';
+            let finalTranscript = ''; // Reset transcript for this session
 
             voiceChatRecognition.onstart = () => {
                 updateVoiceChatStatus('Listening...');
@@ -1219,7 +1226,7 @@
                 }
                 
                 // Display interim or final transcript
-                const displayText = finalTranscript || interimTranscript;
+                const displayText = (finalTranscript + interimTranscript).trim();
                 if (displayText) {
                     userTranscript.textContent = displayText;
                     userTranscript.classList.remove('empty');
@@ -1229,11 +1236,12 @@
             voiceChatRecognition.onend = async () => {
                 if (!voiceChatActive) return;
 
-                if (finalTranscript.trim()) {
+                const trimmedTranscript = finalTranscript.trim();
+                if (trimmedTranscript) {
                     // Send the message
                     updateVoiceChatStatus('Thinking...');
                     updateWaveformState('thinking');
-                    await sendVoiceChatMessage(finalTranscript.trim());
+                    await sendVoiceChatMessage(trimmedTranscript);
                 } else {
                     // No speech detected, resume listening
                     startVoiceChatListening();
@@ -1245,6 +1253,13 @@
                 if (voiceChatActive && event.error !== 'no-speech') {
                     const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
                     updateVoiceChatStatus(`Error: ${userMessage}`);
+                    
+                    // Automatically recover from error by resuming listening after a delay
+                    setTimeout(() => {
+                        if (voiceChatActive) {
+                            startVoiceChatListening();
+                        }
+                    }, VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
                 }
             };
 
@@ -1279,7 +1294,7 @@
                     
                     // Resume listening after error
                     if (voiceChatActive) {
-                        setTimeout(() => startVoiceChatListening(), ERROR_RECOVERY_DELAY_MS);
+                        setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
                     }
                     return;
                 }
@@ -1312,7 +1327,7 @@
 
                 // Resume listening after error
                 if (voiceChatActive) {
-                    setTimeout(() => startVoiceChatListening(), ERROR_RECOVERY_DELAY_MS);
+                    setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
                 }
             }
         }
@@ -1343,6 +1358,7 @@
                 // Stop listening while speaking
                 if (voiceChatRecognition) {
                     voiceChatRecognition.abort();
+                    voiceChatRecognition = null;
                 }
 
                 updateVoiceChatStatus('Speaking...');
@@ -1356,18 +1372,24 @@
                 utterance.lang = 'en-US';
 
                 // Try to use a natural voice - attempt multiple fallback options
-                const voices = voiceChatSynthesis.getVoices();
-                if (voices.length > 0) {
+                // Voices may load asynchronously, so we check available voices
+                const getPreferredVoice = () => {
+                    const voices = voiceChatSynthesis.getVoices();
+                    if (voices.length === 0) {
+                        return null; // No voices available yet
+                    }
                     // Preference order: Google voices > system default English > first English voice > first available
-                    const preferredVoice = 
+                    return (
                         voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
                         voices.find(v => v.lang.startsWith('en') && v.default) ||
                         voices.find(v => v.lang.startsWith('en')) ||
-                        voices[0];
-                    
-                    if (preferredVoice) {
-                        utterance.voice = preferredVoice;
-                    }
+                        voices[0]
+                    );
+                };
+                
+                const preferredVoice = getPreferredVoice();
+                if (preferredVoice) {
+                    utterance.voice = preferredVoice;
                 }
 
                 utterance.onend = () => {
