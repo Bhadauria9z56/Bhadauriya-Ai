@@ -776,7 +776,7 @@
         const API_BASE = '/api';
         const PREVIEW_MAX_LENGTH = 50;
         const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
-        const VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS = 1500; // Delay in milliseconds before resuming listening after error
+        const VOICE_CHAT_ERROR_RECOVERY_DELAY = 1500; // Milliseconds before resuming listening after error
         const SPEECH_SYNTHESIS_RATE = 1;
         const SPEECH_SYNTHESIS_PITCH = 1;
         const SPEECH_SYNTHESIS_VOLUME = 1;
@@ -1249,9 +1249,9 @@
                 console.error('Voice chat recognition error:', event.error);
                 if (voiceChatActive) {
                     // Only show error and recover for non-'no-speech' errors
-                    const shouldRecoverFromError = event.error !== 'no-speech';
+                    const isRecoverableError = event.error !== 'no-speech';
                     
-                    if (shouldRecoverFromError) {
+                    if (isRecoverableError) {
                         const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
                         updateVoiceChatStatus(`Error: ${userMessage}`);
                         
@@ -1260,7 +1260,7 @@
                             if (voiceChatActive) {
                                 startVoiceChatListening();
                             }
-                        }, VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS);
+                        }, VOICE_CHAT_ERROR_RECOVERY_DELAY);
                     }
                 }
             };
@@ -1296,7 +1296,7 @@
                     
                     // Resume listening after error
                     if (voiceChatActive) {
-                        setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS);
+                        setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY);
                     }
                     return;
                 }
@@ -1329,7 +1329,7 @@
 
                 // Resume listening after error
                 if (voiceChatActive) {
-                    setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS);
+                    setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY);
                 }
             }
         }
@@ -1340,14 +1340,14 @@
             text = text.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove bold (**)
             text = text.replace(/__(.*?)__/g, '$1'); // Remove bold (__)
             text = text.replace(/\*(.*?)\*/g, '$1'); // Remove italic (*)
-            // For underscores, only remove when they're emphasis markers (surrounded by spaces or at boundaries)
-            text = text.replace(/(^|\s)_(.*?)_($|\s)/g, '$1$2$3'); // Remove italic (_) with word boundaries
+            // For underscores, use word boundaries to handle _word_ at any position
+            text = text.replace(/\b_(.*?)_\b/g, '$1'); // Remove italic (_) with word boundaries
             text = text.replace(/~~(.*?)~~/g, '$1'); // Remove strikethrough
             text = text.replace(/`(.*?)`/g, '$1'); // Remove inline code
             text = text.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
-            text = text.replace(/#+\s?(.*?)(?:\n|$)/g, '$1 '); // Remove headings
+            text = text.replace(/#+\s?(.*?)(?:\n|$)/g, '$1'); // Remove headings
             text = text.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1'); // Remove links
-            text = text.replace(/>\s?(.*?)(?:\n|$)/g, '$1 '); // Remove blockquotes
+            text = text.replace(/>\s?(.*?)(?:\n|$)/g, '$1'); // Remove blockquotes
             return text.trim();
         }
 
@@ -1381,17 +1381,24 @@
                 if (voices.length > 0) {
                     // Select voice with preference order: Google > first English > first available
                     let selectedVoice = null;
+                    let englishVoice = null;
+                    
                     for (const voice of voices) {
                         if (voice.name.includes('Google') && voice.lang.startsWith('en')) {
                             selectedVoice = voice;
                             break; // Highest priority, stop searching
                         }
-                        if (!selectedVoice && voice.lang.startsWith('en')) {
-                            selectedVoice = voice; // Remember first English voice
+                        if (!englishVoice && voice.lang.startsWith('en')) {
+                            englishVoice = voice; // Remember first English voice for fallback
                         }
-                        if (!selectedVoice) {
-                            selectedVoice = voice; // Remember first available as fallback
-                        }
+                    }
+                    
+                    // Use best match or fallbacks in order
+                    if (!selectedVoice && englishVoice) {
+                        selectedVoice = englishVoice;
+                    }
+                    if (!selectedVoice && voices.length > 0) {
+                        selectedVoice = voices[0]; // Last resort: use first available
                     }
                     
                     if (selectedVoice) {
