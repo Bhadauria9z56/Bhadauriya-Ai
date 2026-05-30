@@ -1,6 +1,6 @@
 # Bhadauriya AI Chatbot
 
-A professional AI chatbot powered by Google Gemini, deployed on Railway with a nature-inspired dashboard interface.
+A professional AI chatbot powered by Groq, deployed on Railway with a nature-inspired dashboard interface.
 
 ---
 
@@ -13,7 +13,7 @@ Deployed at: `bhadauriya-ai-production.up.railway.app`
 ## Tech Stack
 
 - **Backend**: Node.js, Express
-- **AI Engine**: Google Gemini 2.5 Flash
+- **AI Engine**: Groq (llama-3.3-70b-versatile)
 - **Frontend**: Vanilla HTML, CSS, JavaScript
 - **Deployment**: Railway
 - **Version Control**: GitHub
@@ -22,7 +22,7 @@ Deployed at: `bhadauriya-ai-production.up.railway.app`
 
 ## Features
 
-- Real-time AI responses powered by Gemini
+- Real-time AI responses powered by Groq
 - Nature-inspired forest green UI
 - Conversation memory within session
 - Supports Hindi and English
@@ -61,8 +61,8 @@ npm install
 # Create environment file
 cp .env.example .env
 
-# Add your Gemini API key in .env
-GEMINI_API_KEY=your_key_here
+# Add your Groq API key in .env
+GROQ_API_KEY=your_key_here
 
 # Start the server
 npm start
@@ -77,7 +77,7 @@ http://localhost:3000
 
 | Variable | Description |
 |----------|-------------|
-| `GEMINI_API_KEY` | Your Google Gemini API key from aistudio.google.com |
+| `GROQ_API_KEY` | Your Groq API key from console.groq.com |
 | `BOT_NAME` | Display name for the chatbot |
 | `PORT` | Server port (Railway sets this automatically) |
 | `SYSTEM_PROMPT` | Custom personality prompt for the AI |
@@ -95,12 +95,11 @@ http://localhost:3000
 
 ---
 
-## Getting a Gemini API Key
+## Getting a Groq API Key
 
-1. Go to aistudio.google.com
-2. Click "Get API Key"
-3. Click "Create API Key"
-4. Copy and paste it into your .env file
+1. Go to console.groq.com
+2. Create an API key
+3. Copy and paste it into your .env file as `GROQ_API_KEY`
 
 ---
 
