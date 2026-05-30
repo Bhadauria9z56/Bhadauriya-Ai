@@ -35,7 +35,7 @@ setInterval(() => {
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT ||
   'You are Bhadauriya AI, a helpful, intelligent and friendly assistant. Always respond in the same language the user writes in.';
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+//  Routes
 
 // Health check (Railway ke liye zaroori)
 app.get('/health', (req, res) => {
@@ -69,7 +69,7 @@ const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
 // Images should be base64-encoded data URLs
 // Documents should be text content (PDF, Word, etc. are not supported - use TXT or MD)
 app.post('/api/chat', async (req, res) => {
-  const { message, sessionId, images = [], documents = [] } = req.body;
+  const { message, sessionId, images = [], documents = [], history = [] } = req.body;
 
   // Either message or files should exist
   if ((!message || !message.trim()) && images.length === 0 && documents.length === 0) {
@@ -93,12 +93,17 @@ app.post('/api/chat', async (req, res) => {
     const newId = sessionId || uuidv4();
     session = {
       id: newId,
-      history: [],
+      history: normalizeClientHistory(history),
       createdAt: Date.now(),
       lastActive: Date.now(),
-      messageCount: 0
+      messageCount: Math.ceil(history.length / 2)
     };
     sessions.set(newId, session);
+  }
+
+  if (Array.isArray(history) && history.length && session.history.length === 0) {
+    session.history = normalizeClientHistory(history);
+    session.messageCount = Math.ceil(history.length / 2);
   }
 
   session.lastActive = Date.now();
@@ -207,6 +212,18 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+
+function normalizeClientHistory(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .filter(item => item && ['user', 'model'].includes(item.role) && typeof item.text === 'string' && item.text.trim())
+    .slice(-40)
+    .map(item => ({
+      role: item.role,
+      parts: [{ text: item.text.trim() }]
+    }));
+}
 // Clear session history
 app.delete('/api/session/:sessionId', (req, res) => {
   const { sessionId } = req.params;
@@ -234,11 +251,5 @@ app.get('*', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`
-╔══════════════════════════════════════╗
-║   🤖 Bhadauriya AI Chatbot           ║
-║   Port: ${PORT}                         ║
-║   Status: LIVE ✅                    ║
-╚══════════════════════════════════════╝
-  `);
+  console.log(`Bhadauriya AI Chatbot running on port ${PORT}`);
 });

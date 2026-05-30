@@ -669,14 +669,124 @@
                 padding-bottom: 20px;
             }
         }
+
+        /* ASCII labels for compact action buttons */
+        .input-button {
+            width: auto;
+            min-width: 42px;
+            padding: 0 8px;
+            font-size: 12px;
+        }
+
+        .input-button.send {
+            min-width: 48px;
+        }
+
+        /* Mobile history drawer and delete controls */
+        .chat-history-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .chat-history-title {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .delete-chat-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        .delete-chat-btn:hover {
+            background: rgba(239, 68, 68, 0.16);
+            color: #f87171;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .menu-toggle {
+            display: none;
+            min-width: 48px;
+            height: 36px;
+            padding: 0 8px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .sidebar-overlay {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: flex !important;
+                width: min(84vw, 300px) !important;
+                position: fixed;
+                inset: 0 auto 0 0;
+                z-index: 1500;
+                transform: translateX(-105%);
+                transition: transform 0.2s ease;
+                box-shadow: 20px 0 60px rgba(0, 0, 0, 0.45);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar-overlay {
+                display: block;
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.55);
+                z-index: 1400;
+                opacity: 0;
+                pointer-events: none;
+                transition: opacity 0.2s ease;
+            }
+
+            .sidebar-overlay.active {
+                opacity: 1;
+                pointer-events: auto;
+            }
+
+            .menu-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .topbar {
+                padding: 8px 12px;
+            }
+        }
     </style>
 </head>
 <body>
     <!-- SIDEBAR -->
-    <div class="sidebar">
+    <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <button class="new-chat-btn">
-                <span>➕</span>
+                <span>+</span>
                 <span>New Chat</span>
             </button>
         </div>
@@ -686,11 +796,16 @@
         </div>
     </div>
 
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
     <!-- MAIN CONTENT -->
     <div class="main-content">
         <!-- TOP BAR -->
         <div class="topbar">
-            <div class="topbar-title">Bhadauriya AI</div>
+            <div class="topbar-left">
+                <button class="menu-toggle" id="menu-toggle" type="button" aria-label="Open previous chats">Menu</button>
+                <div class="topbar-title">Bhadauriya AI</div>
+            </div>
             <div class="topbar-status">
                 <span class="status-dot"></span>
                 <span>Ready</span>
@@ -707,22 +822,12 @@
             <div class="input-wrapper">
                 <div class="attachment-preview"></div>
                 <div class="input-controls">
-                    <button class="input-button" title="Attach Image">
-                        🖼️
-                    </button>
-                    <button class="input-button" title="Attach Document">
-                        📎
-                    </button>
+                    <button class="input-button" title="Attach Image">Image</button>
+                    <button class="input-button" title="Attach Document">File</button>
                     <textarea class="input-box" placeholder="Message Bhadauriya AI..." rows="1"></textarea>
-                    <button class="input-button" title="Voice Input">
-                        🎤
-                    </button>
-                    <button class="input-button voice-chat" title="Voice Chat" aria-label="Start voice chat with AI">
-                        ☎️
-                    </button>
-                    <button class="input-button send" title="Send">
-                        ➤
-                    </button>
+                    <button class="input-button" title="Voice Input">Mic</button>
+                    <button class="input-button voice-chat" title="Voice Chat" aria-label="Start voice chat with AI">Call</button>
+                    <button class="input-button send" title="Send">Send</button>
                 </div>
             </div>
         </div>
@@ -733,7 +838,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <span class="modal-title">Image</span>
-                <button class="modal-close">✕</button>
+                <button class="modal-close"></button>
             </div>
             <div id="image-modal-body"></div>
         </div>
@@ -767,7 +872,7 @@
         </div>
 
         <div class="voice-chat-controls">
-            <button class="voice-chat-btn end-call" id="end-call-btn" title="End Call">✕</button>
+            <button class="voice-chat-btn end-call" id="end-call-btn" title="End Call"></button>
         </div>
     </div>
 
@@ -775,6 +880,7 @@
         // Constants and State
         const API_BASE = '/api';
         const PREVIEW_MAX_LENGTH = 50;
+        const CHAT_STORAGE_KEY = 'bhadauriya-ai-chats';
         const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
         const VOICE_CHAT_ERROR_RECOVERY_DELAY = 1500; // Milliseconds before resuming listening after error
         const SPEECH_SYNTHESIS_RATE = 1;
@@ -814,6 +920,9 @@
         const sendBtn = document.querySelectorAll('.input-button')[4];
         const newChatBtn = document.querySelector('.new-chat-btn');
         const chatHistory = document.querySelector('.chat-history');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
         const attachmentPreview = document.querySelector('.attachment-preview');
         const imageModal = document.getElementById('image-modal');
         const imageModalClose = imageModal.querySelector('.modal-close');
@@ -831,11 +940,17 @@
             const response = await fetch(`${API_BASE}/session`, { method: 'POST' });
             const data = await response.json();
             sessionId = data.sessionId;
-            newChat();
-            loadChatHistory();
             createHiddenFileInputs();
             setupEventListeners();
-            
+
+            const chats = readStoredChats();
+            if (chats.length > 0) {
+                switchChat(chats[0].id);
+            } else {
+                await newChat();
+            }
+            loadChatHistory();
+
             // Preload voices for speech synthesis
             if (voiceChatSynthesis) {
                 voiceChatSynthesis.onvoiceschanged = () => {
@@ -866,7 +981,12 @@
             voiceBtn.addEventListener('click', startVoiceInput);
             voiceChatBtn.addEventListener('click', startVoiceChat);
             endCallBtn.addEventListener('click', endVoiceChat);
-            newChatBtn.addEventListener('click', newChat);
+            newChatBtn.addEventListener('click', () => {
+                newChat();
+                closeSidebar();
+            });
+            menuToggle.addEventListener('click', openSidebar);
+            sidebarOverlay.addEventListener('click', closeSidebar);
 
             // Modal
             imageModalClose.addEventListener('click', () => imageModal.classList.remove('active'));
@@ -897,7 +1017,7 @@
 
         function handleImageSelect(e) {
             const files = Array.from(e.target.files);
-            Promise.all(files.map(file => 
+            Promise.all(files.map(file =>
                 new Promise((resolve) => {
                     const reader = new FileReader();
                     reader.onload = () => {
@@ -918,15 +1038,15 @@
 
         function handleDocumentSelect(e) {
             const files = Array.from(e.target.files);
-            Promise.all(files.map(file => 
+            Promise.all(files.map(file =>
                 new Promise((resolve) => {
                     // Check file size
                     if (file.size > MAX_DOCUMENT_SIZE) {
-                        displayMessage('bot', { text: `❌ File "${file.name}" is too large. Maximum size is 1MB.` });
+                        displayMessage('bot', { text: ` File "${file.name}" is too large. Maximum size is 1MB.` });
                         resolve();
                         return;
                     }
-                    
+
                     const reader = new FileReader();
                     reader.onload = () => {
                         selectedDocuments.push({
@@ -936,7 +1056,7 @@
                         resolve();
                     };
                     reader.onerror = () => {
-                        displayMessage('bot', { text: `❌ Error reading file "${file.name}"` });
+                        displayMessage('bot', { text: ` Error reading file "${file.name}"` });
                         resolve();
                     };
                     reader.readAsText(file);
@@ -949,11 +1069,11 @@
 
         function updateAttachmentPreview() {
             attachmentPreview.innerHTML = '';
-            
+
             selectedImages.forEach((img, idx) => {
                 const div = document.createElement('div');
                 div.className = 'preview-item';
-                div.innerHTML = `🖼️ ${img.name} <span class="preview-remove">✕</span>`;
+                div.innerHTML = ` ${img.name} <span class="preview-remove"></span>`;
                 const removeBtn = div.querySelector('.preview-remove');
                 removeBtn.addEventListener('click', () => removeImage(idx));
                 attachmentPreview.appendChild(div);
@@ -962,7 +1082,7 @@
             selectedDocuments.forEach((doc, idx) => {
                 const div = document.createElement('div');
                 div.className = 'preview-item';
-                div.innerHTML = `📄 ${doc.name} <span class="preview-remove">✕</span>`;
+                div.innerHTML = ` ${doc.name} <span class="preview-remove"></span>`;
                 const removeBtn = div.querySelector('.preview-remove');
                 removeBtn.addEventListener('click', () => removeDocument(idx));
                 attachmentPreview.appendChild(div);
@@ -999,9 +1119,11 @@
                 images,
                 documents
             };
+            const apiHistory = getApiHistory(currentChatId);
 
             // Display user message
             displayMessage('user', userContent);
+            appendStoredMessage(currentChatId, 'user', userContent);
 
             // Clear input
             inputBox.value = '';
@@ -1020,7 +1142,8 @@
                         message,
                         sessionId: currentChatId,
                         images,
-                        documents
+                        documents,
+                        history: apiHistory
                     })
                 });
 
@@ -1032,7 +1155,7 @@
 
                 const data = await response.json();
                 displayMessage('bot', { text: data.reply });
-
+                appendStoredMessage(currentChatId, 'bot', { text: data.reply });
                 saveChat(message, images, documents);
             } catch (error) {
                 displayMessage('bot', { text: `Error: ${error.message}` });
@@ -1079,7 +1202,7 @@
                     content.documents.forEach(doc => {
                         const chip = document.createElement('div');
                         chip.className = 'doc-chip';
-                        chip.innerHTML = `<span class="doc-icon">📄</span><span>${doc.name}</span>`;
+                        chip.innerHTML = `<span class="doc-icon"></span><span>${doc.name}</span>`;
                         filePreview.appendChild(chip);
                     });
                     messageGroup.appendChild(filePreview);
@@ -1124,7 +1247,7 @@
         function startVoiceInput() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                displayMessage('bot', { text: '❌ Speech Recognition is not supported in this browser. Please try using Chrome or Edge.' });
+                displayMessage('bot', { text: ' Speech Recognition is not supported in this browser. Please try using Chrome or Edge.' });
                 return;
             }
 
@@ -1135,16 +1258,16 @@
 
             isListening = true;
             voiceBtn.classList.add('listening');
-            voiceBtn.textContent = '🎙️';
+            voiceBtn.textContent = '';
 
             recognition.onstart = () => {
-                voiceBtn.textContent = '🔴';
+                voiceBtn.textContent = '';
             };
 
             recognition.onend = () => {
                 isListening = false;
                 voiceBtn.classList.remove('listening');
-                voiceBtn.textContent = '🎤';
+                voiceBtn.textContent = '';
             };
 
             recognition.onresult = (event) => {
@@ -1160,23 +1283,23 @@
 
             recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
-                displayMessage('bot', { text: `❌ Speech recognition error: ${event.error}` });
+                displayMessage('bot', { text: ` Speech recognition error: ${event.error}` });
             };
 
             recognition.start();
         }
 
-        // ─── VOICE CHAT FUNCTIONS ───────────────────────────────────────────────
+        //  VOICE CHAT FUNCTIONS
 
         function startVoiceChat() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                displayMessage('bot', { text: '❌ Voice Chat is not supported in this browser. Please use Chrome or Edge.' });
+                displayMessage('bot', { text: ' Voice Chat is not supported in this browser. Please use Chrome or Edge.' });
                 return;
             }
 
             if (!voiceChatSynthesis) {
-                displayMessage('bot', { text: '❌ Text-to-Speech is not supported in this browser.' });
+                displayMessage('bot', { text: ' Text-to-Speech is not supported in this browser.' });
                 return;
             }
 
@@ -1221,7 +1344,7 @@
                         interimTranscript += transcript;
                     }
                 }
-                
+
                 // Display interim or final transcript
                 const displayText = (finalTranscript + interimTranscript).trim();
                 if (displayText) {
@@ -1250,11 +1373,11 @@
                 if (voiceChatActive) {
                     // Only show error and recover for non-'no-speech' errors
                     const isRecoverableError = event.error !== 'no-speech';
-                    
+
                     if (isRecoverableError) {
                         const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
                         updateVoiceChatStatus(`Error: ${userMessage}`);
-                        
+
                         // Automatically recover from error by resuming listening after a delay
                         setTimeout(() => {
                             if (voiceChatActive) {
@@ -1270,6 +1393,7 @@
 
         async function sendVoiceChatMessage(message) {
             if (!message.trim()) return;
+            const apiHistory = getApiHistory(currentChatId);
 
             // Update UI
             userTranscript.textContent = message;
@@ -1284,7 +1408,8 @@
                         message: message.trim(),
                         sessionId: currentChatId,
                         images: [],
-                        documents: []
+                        documents: [],
+                        history: apiHistory
                     })
                 });
 
@@ -1293,7 +1418,7 @@
                     displayMessage('bot', { text: `Error: ${error.error}` });
                     aiTranscript.textContent = 'Error occurred. Try again.';
                     aiTranscript.classList.remove('empty');
-                    
+
                     // Resume listening after error
                     if (voiceChatActive) {
                         setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY);
@@ -1305,8 +1430,11 @@
                 const reply = data.reply;
 
                 // Display in main chat
-                displayMessage('user', { message });
+                const voiceUserContent = { message, images: [], documents: [] };
+                displayMessage('user', voiceUserContent);
+                appendStoredMessage(currentChatId, 'user', voiceUserContent);
                 displayMessage('bot', { text: reply });
+                appendStoredMessage(currentChatId, 'bot', { text: reply });
 
                 // Update voice chat transcript
                 aiTranscript.textContent = reply;
@@ -1315,7 +1443,7 @@
                 // Speak the response
                 if (voiceChatActive) {
                     await speakResponse(reply);
-                    
+
                     // Resume listening after speaking
                     if (voiceChatActive) {
                         startVoiceChatListening();
@@ -1382,7 +1510,7 @@
                     // Select voice with preference order: Google > first English > first available
                     let selectedVoice = null;
                     let englishVoice = null;
-                    
+
                     for (const voice of voices) {
                         if (voice.name.includes('Google') && voice.lang.startsWith('en')) {
                             selectedVoice = voice;
@@ -1392,7 +1520,7 @@
                             englishVoice = voice; // Remember first English voice for fallback
                         }
                     }
-                    
+
                     // Use best match or fallbacks in order
                     if (!selectedVoice && englishVoice) {
                         selectedVoice = englishVoice;
@@ -1400,7 +1528,7 @@
                     if (!selectedVoice && voices.length > 0) {
                         selectedVoice = voices[0]; // Last resort: use first available
                     }
-                    
+
                     if (selectedVoice) {
                         utterance.voice = selectedVoice;
                     }
@@ -1461,76 +1589,184 @@
             aiTranscript.classList.add('empty');
         }
 
-        function newChat() {
+        function readStoredChats() {
+            try {
+                const chats = JSON.parse(localStorage.getItem(CHAT_STORAGE_KEY) || '[]');
+                return Array.isArray(chats) ? chats : [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function writeStoredChats(chats) {
+            localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chats));
+        }
+
+        function getStoredChat(chatId) {
+            return readStoredChats().find(chat => chat.id === chatId);
+        }
+
+        function createStoredChat(id = sessionId || `local-${Date.now()}`) {
+            const now = new Date().toLocaleString();
+            const chat = {
+                id,
+                timestamp: now,
+                lastMessage: 'New chat',
+                messages: []
+            };
+            writeStoredChats([chat, ...readStoredChats().filter(item => item.id !== id)]);
+            return chat;
+        }
+
+        function getMessagePreview(message, images = [], documents = []) {
+            if (message && message.trim()) {
+                return message.substring(0, PREVIEW_MAX_LENGTH) + (message.length > PREVIEW_MAX_LENGTH ? '...' : '');
+            }
+            if (images && images.length > 0) return `Sent ${images.length} image(s)`;
+            if (documents && documents.length > 0) return `Sent ${documents.length} document(s)`;
+            return 'Chat started';
+        }
+
+        function getApiHistory(chatId) {
+            const chat = getStoredChat(chatId);
+            if (!chat || !Array.isArray(chat.messages)) return [];
+            return chat.messages
+                .filter(item => item.role === 'user' || item.role === 'bot')
+                .map(item => ({
+                    role: item.role === 'bot' ? 'model' : 'user',
+                    text: item.role === 'bot' ? item.content.text : getMessagePreview(item.content.message, item.content.images, item.content.documents)
+                }))
+                .filter(item => item.text && item.text.trim())
+                .slice(-40);
+        }
+
+        function appendStoredMessage(chatId, role, content) {
+            let chats = readStoredChats();
+            let chat = chats.find(item => item.id === chatId);
+            if (!chat) {
+                chat = createStoredChat(chatId);
+                chats = readStoredChats();
+            }
+            chat.messages = Array.isArray(chat.messages) ? chat.messages : [];
+            chat.messages.push({ role, content, createdAt: Date.now() });
+            chat.timestamp = new Date().toLocaleString();
+            chat.lastMessage = role === 'bot'
+                ? (content.text || 'AI response').substring(0, PREVIEW_MAX_LENGTH)
+                : getMessagePreview(content.message, content.images, content.documents);
+            writeStoredChats([chat, ...chats.filter(item => item.id !== chat.id)]);
+            loadChatHistory();
+        }
+
+        function renderEmptyState() {
             messagesWrapper.innerHTML = `
                 <div class="empty-state">
-                    <div class="empty-state-icon">💬</div>
+                    <div class="empty-state-icon"></div>
                     <div class="empty-state-text">Start a new conversation</div>
                 </div>
             `;
-            currentChatId = sessionId;
+        }
+
+        async function newChat() {
+            try {
+                const response = await fetch(`${API_BASE}/session`, { method: 'POST' });
+                const data = await response.json();
+                sessionId = data.sessionId || sessionId;
+            } catch (error) {
+                sessionId = `local-${Date.now()}`;
+            }
+            currentChatId = sessionId || `local-${Date.now()}`;
+            createStoredChat(currentChatId);
+            renderEmptyState();
             selectedImages = [];
             selectedDocuments = [];
             updateAttachmentPreview();
             updateSendButtonState();
+            loadChatHistory();
         }
-
         function saveChat(message, images, documents) {
-            const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-            const chatIndex = chats.findIndex(c => c.id === currentChatId);
-            const timestamp = new Date().toLocaleString();
-            
-            // Create a preview of the last message
-            let preview = 'Chat started';
-            
-            if (message && message.trim()) {
-                // Prefer message preview
-                preview = message.substring(0, PREVIEW_MAX_LENGTH) + (message.length > PREVIEW_MAX_LENGTH ? '...' : '');
-            } else if (images && images.length > 0) {
-                // If no message, show images info
-                preview = `Sent ${images.length} image(s)`;
-            } else if (documents && documents.length > 0) {
-                // If no message or images, show documents info
-                preview = `Sent ${documents.length} document(s)`;
-            }
-            
-            if (chatIndex > -1) {
-                chats[chatIndex].lastMessage = preview;
-                chats[chatIndex].timestamp = timestamp;
-            } else {
-                chats.push({
-                    id: currentChatId,
-                    timestamp,
-                    lastMessage: preview
-                });
-            }
-            
-            localStorage.setItem('chats', JSON.stringify(chats));
+            const chats = readStoredChats();
+            const chat = chats.find(c => c.id === currentChatId) || createStoredChat(currentChatId);
+            chat.timestamp = new Date().toLocaleString();
+            chat.lastMessage = getMessagePreview(message, images, documents);
+            writeStoredChats([chat, ...chats.filter(item => item.id !== chat.id)]);
             loadChatHistory();
         }
 
         function loadChatHistory() {
-            const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+            const chats = readStoredChats();
             chatHistory.innerHTML = '';
-            
-            [...chats].reverse().forEach(chat => {
+
+            chats.forEach(chat => {
                 const item = document.createElement('div');
                 item.className = 'chat-history-item';
                 if (chat.id === currentChatId) item.classList.add('active');
-                item.textContent = chat.lastMessage || 'Chat';
                 item.title = chat.timestamp;
+
+                const title = document.createElement('span');
+                title.className = 'chat-history-title';
+                title.textContent = chat.lastMessage || 'Chat';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-chat-btn';
+                deleteBtn.type = 'button';
+                deleteBtn.title = 'Delete chat';
+                deleteBtn.textContent = 'x';
+                deleteBtn.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    deleteChat(chat.id);
+                });
+
+                item.appendChild(title);
+                item.appendChild(deleteBtn);
                 item.addEventListener('click', () => switchChat(chat.id));
                 chatHistory.appendChild(item);
             });
         }
 
         function switchChat(chatId) {
+            const chat = getStoredChat(chatId);
+            if (!chat) return;
             currentChatId = chatId;
+            messagesWrapper.innerHTML = '';
+            selectedImages = [];
+            selectedDocuments = [];
+            updateAttachmentPreview();
+            updateSendButtonState();
+
+            if (!chat.messages || chat.messages.length === 0) {
+                renderEmptyState();
+            } else {
+                chat.messages.forEach(item => displayMessage(item.role, item.content));
+            }
+
             loadChatHistory();
-            // In a real app, would load chat history from backend
-            newChat();
+            closeSidebar();
         }
 
+        async function deleteChat(chatId) {
+            const chats = readStoredChats().filter(chat => chat.id !== chatId);
+            writeStoredChats(chats);
+            fetch(`${API_BASE}/session/${encodeURIComponent(chatId)}`, { method: 'DELETE' }).catch(() => {});
+
+            if (currentChatId === chatId) {
+                if (chats.length > 0) {
+                    switchChat(chats[0].id);
+                } else {
+                    await newChat();
+                }
+            } else {
+                loadChatHistory();
+            }
+        }
+        function openSidebar() {
+            sidebar.classList.add('open');
+            sidebarOverlay.classList.add('active');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('active');
+        }
         // Initialize on load
         window.addEventListener('load', init);
     </script>
