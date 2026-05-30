@@ -216,9 +216,9 @@ app.post('/api/chat', async (req, res) => {
       { role: 'model', parts: [{ text: responseText }] }
     );
 
-    // Max 40 turns history rakho
-    if (session.history.length > 40) {
-      session.history = session.history.slice(-40);
+    // Max 6 turns history rakho
+    if (session.history.length > 6) {
+      session.history = session.history.slice(-6);
     }
 
     res.json({
@@ -246,7 +246,7 @@ function normalizeClientHistory(history) {
 
   return history
     .filter(item => item && ['user', 'model'].includes(item.role) && typeof item.text === 'string' && item.text.trim())
-    .slice(-40)
+    .slice(-6)
     .map(item => ({
       role: item.role,
       parts: [{ text: item.text.trim() }]
