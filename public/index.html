@@ -779,6 +779,10 @@
                 padding: 8px 12px;
             }
         }
+
+        .error-message {
+            color: #ffb4ab;
+        }
     </style>
 </head>
 <body>
@@ -1106,6 +1110,11 @@
             sendBtn.disabled = !hasContent;
         }
 
+        function clearEmptyState() {
+            const emptyState = messagesWrapper.querySelector('.empty-state');
+            if (emptyState) emptyState.remove();
+        }
+
         async function sendMessage() {
             const message = inputBox.value.trim();
             if (!message && selectedImages.length === 0 && selectedDocuments.length === 0) return;
@@ -1122,6 +1131,7 @@
             const apiHistory = getApiHistory(currentChatId);
 
             // Display user message
+            clearEmptyState();
             displayMessage('user', userContent);
             appendStoredMessage(currentChatId, 'user', userContent);
 
@@ -1214,7 +1224,7 @@
                 avatar.className = 'bot-avatar';
                 avatar.textContent = 'B';
                 const bubble = document.createElement('div');
-                bubble.className = 'message-bubble-bot';
+                bubble.className = 'message-bubble-bot' + (content.error ? ' error-message' : '');
                 bubble.innerHTML = formatBotMessage(content.text);
                 botMsg.appendChild(avatar);
                 botMsg.appendChild(bubble);
@@ -1631,7 +1641,7 @@
             const chat = getStoredChat(chatId);
             if (!chat || !Array.isArray(chat.messages)) return [];
             return chat.messages
-                .filter(item => item.role === 'user' || item.role === 'bot')
+                .filter(item => !item.content?.error && !String(item.content?.text || '').startsWith('Error:') && (item.role === 'user' || item.role === 'bot'))
                 .map(item => ({
                     role: item.role === 'bot' ? 'model' : 'user',
                     text: item.role === 'bot' ? item.content.text : getMessagePreview(item.content.message, item.content.images, item.content.documents)
