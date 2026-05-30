@@ -1003,7 +1003,7 @@
         <div class="sidebar-footer">
             <div class="sidebar-model-badge">
                 <span class="model-dot"></span>
-                <span id="model-badge-text">Gemini 2.0 Flash</span>
+                <span id="model-badge-text">Bhadauriya AI</span>
             </div>
         </div>
     </aside>
@@ -1192,7 +1192,7 @@
             const statsRes = await fetch(`${API_BASE}/stats`);
             const stats = await statsRes.json();
             if (stats.model) {
-                document.getElementById('model-badge-text').textContent = stats.model;
+                document.getElementById('model-badge-text').textContent = 'Bhadauriya AI';
             }
         } catch (_) {}
 
