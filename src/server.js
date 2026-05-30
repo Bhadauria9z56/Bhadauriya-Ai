@@ -162,9 +162,9 @@ app.post('/api/chat', async (req, res) => {
       userHistoryParts.push({ text: `[User sent ${documents.length} document(s)]` });
     }
 
-    // History update karo
+    // History update karo (userHistoryParts guaranteed to have content due to validation above)
     session.history.push(
-      { role: 'user', parts: userHistoryParts.length > 0 ? userHistoryParts : [{ text: 'Empty message with files' }] },
+      { role: 'user', parts: userHistoryParts },
       { role: 'model', parts: [{ text: responseText }] }
     );
 
@@ -186,7 +186,7 @@ app.post('/api/chat', async (req, res) => {
       return res.status(401).json({ error: 'Gemini API key invalid hai. .env check karo.' });
     }
     if (error.message?.includes('QUOTA_EXCEEDED')) {
-      return res.status(429).json({ error: 'API quota khatam ho gya. Thodi der baad try karo.' });
+      return res.status(429).json({ error: 'API quota khatam ho gaya. Thodi der baad try karo.' });
     }
 
     res.status(500).json({ error: 'Kuch gadbad ho gayi. Dobara try karo.' });

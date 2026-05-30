@@ -609,6 +609,7 @@
             sessionId = data.sessionId;
             newChat();
             loadChatHistory();
+            createHiddenFileInputs();
             setupEventListeners();
         }
 
@@ -633,9 +634,6 @@
             attachDocBtn.addEventListener('click', () => document.getElementById('doc-input').click());
             voiceBtn.addEventListener('click', startVoiceInput);
             newChatBtn.addEventListener('click', newChat);
-
-            // File inputs
-            createHiddenFileInputs();
 
             // Modal
             imageModalClose.addEventListener('click', () => imageModal.classList.remove('active'));
@@ -792,7 +790,7 @@
 
                 const data = await response.json();
                 displayMessage('bot', { text: data.reply });
-                saveChat();
+                saveChat(message, images, documents);
             } catch (error) {
                 displayMessage('bot', { text: `Error: ${error.message}` });
             } finally {
@@ -931,19 +929,33 @@
             updateSendButtonState();
         }
 
-        function saveChat() {
+        function saveChat(message, images, documents) {
             const chats = JSON.parse(localStorage.getItem('chats') || '[]');
             const chatIndex = chats.findIndex(c => c.id === currentChatId);
             const timestamp = new Date().toLocaleString();
             
+            // Create a preview of the last message
+            let preview = 'Chat started';
+            
+            if (message && message.trim()) {
+                // Prefer message preview
+                preview = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+            } else if (images && images.length > 0) {
+                // If no message, show images info
+                preview = `Sent ${images.length} image(s)`;
+            } else if (documents && documents.length > 0) {
+                // If no message or images, show documents info
+                preview = `Sent ${documents.length} document(s)`;
+            }
+            
             if (chatIndex > -1) {
-                chats[chatIndex].lastMessage = inputBox.value || 'Sent files';
+                chats[chatIndex].lastMessage = preview;
                 chats[chatIndex].timestamp = timestamp;
             } else {
                 chats.push({
                     id: currentChatId,
                     timestamp,
-                    lastMessage: inputBox.value || 'Started chat'
+                    lastMessage: preview
                 });
             }
             
