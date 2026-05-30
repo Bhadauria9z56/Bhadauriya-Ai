@@ -583,6 +583,8 @@
     <script>
         // Constants and State
         const API_BASE = '/api';
+        const PREVIEW_MAX_LENGTH = 50;
+        const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
         let sessionId = null;
         let currentChatId = null;
         let isListening = false;
@@ -655,7 +657,7 @@
             const docInput = document.createElement('input');
             docInput.type = 'file';
             docInput.id = 'doc-input';
-            docInput.accept = '.pdf,.txt,.doc,.docx,.md';
+            docInput.accept = '.txt,.md';
             docInput.multiple = true;
             docInput.style.display = 'none';
             docInput.addEventListener('change', handleDocumentSelect);
@@ -687,12 +689,23 @@
             const files = Array.from(e.target.files);
             Promise.all(files.map(file => 
                 new Promise((resolve) => {
+                    // Check file size
+                    if (file.size > MAX_DOCUMENT_SIZE) {
+                        displayMessage('bot', { text: `❌ File "${file.name}" is too large. Maximum size is 1MB.` });
+                        resolve();
+                        return;
+                    }
+                    
                     const reader = new FileReader();
                     reader.onload = () => {
                         selectedDocuments.push({
                             content: reader.result,
                             name: file.name
                         });
+                        resolve();
+                    };
+                    reader.onerror = () => {
+                        displayMessage('bot', { text: `❌ Error reading file "${file.name}"` });
                         resolve();
                     };
                     reader.readAsText(file);
@@ -709,20 +722,18 @@
             selectedImages.forEach((img, idx) => {
                 const div = document.createElement('div');
                 div.className = 'preview-item';
-                div.innerHTML = `
-                    🖼️ ${img.name}
-                    <span class="preview-remove" onclick="removeImage(${idx})">✕</span>
-                `;
+                div.innerHTML = `🖼️ ${img.name} <span class="preview-remove">✕</span>`;
+                const removeBtn = div.querySelector('.preview-remove');
+                removeBtn.addEventListener('click', () => removeImage(idx));
                 attachmentPreview.appendChild(div);
             });
 
             selectedDocuments.forEach((doc, idx) => {
                 const div = document.createElement('div');
                 div.className = 'preview-item';
-                div.innerHTML = `
-                    📄 ${doc.name}
-                    <span class="preview-remove" onclick="removeDocument(${idx})">✕</span>
-                `;
+                div.innerHTML = `📄 ${doc.name} <span class="preview-remove">✕</span>`;
+                const removeBtn = div.querySelector('.preview-remove');
+                removeBtn.addEventListener('click', () => removeDocument(idx));
                 attachmentPreview.appendChild(div);
             });
 
@@ -808,7 +819,7 @@
                 userMsg.className = 'message-user';
                 const bubble = document.createElement('div');
                 bubble.className = 'message-bubble-user';
-                bubble.textContent = content.message;
+                bubble.textContent = content.message || '📎 Sent files';
                 userMsg.appendChild(bubble);
                 messageGroup.appendChild(userMsg);
 
@@ -821,7 +832,7 @@
                         const thumb = document.createElement('img');
                         thumb.className = 'image-thumbnail';
                         thumb.src = img.data;
-                        thumb.onclick = () => showImageModal(img.data);
+                        thumb.addEventListener('click', () => showImageModal(img.data));
                         filePreview.appendChild(thumb);
                     });
                     messageGroup.appendChild(filePreview);
@@ -874,7 +885,7 @@
         function startVoiceInput() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                alert('Speech Recognition not supported in this browser');
+                displayMessage('bot', { text: '❌ Speech Recognition is not supported in this browser. Please try using Chrome, Edge, or Safari.' });
                 return;
             }
 
@@ -910,6 +921,7 @@
 
             recognition.onerror = (event) => {
                 console.error('Speech recognition error:', event.error);
+                displayMessage('bot', { text: `❌ Speech recognition error: ${event.error}` });
             };
 
             recognition.start();
@@ -939,7 +951,7 @@
             
             if (message && message.trim()) {
                 // Prefer message preview
-                preview = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+                preview = message.substring(0, PREVIEW_MAX_LENGTH) + (message.length > PREVIEW_MAX_LENGTH ? '...' : '');
             } else if (images && images.length > 0) {
                 // If no message, show images info
                 preview = `Sent ${images.length} image(s)`;

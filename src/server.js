@@ -60,6 +60,9 @@ app.post('/api/session', (req, res) => {
   res.json({ sessionId });
 });
 
+// Constants
+const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
+
 // Chat endpoint - now with file support
 app.post('/api/chat', async (req, res) => {
   const { message, sessionId, images = [], documents = [] } = req.body;
@@ -71,6 +74,13 @@ app.post('/api/chat', async (req, res) => {
 
   if (!process.env.GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY set nahi hai' });
+  }
+
+  // Validate document sizes
+  for (const doc of documents) {
+    if (doc.content && doc.content.length > MAX_DOCUMENT_SIZE) {
+      return res.status(400).json({ error: `Document "${doc.name}" is too large. Maximum size is 1MB.` });
+    }
   }
 
   // Session get ya banao
