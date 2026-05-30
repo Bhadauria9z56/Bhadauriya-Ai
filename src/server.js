@@ -64,6 +64,10 @@ app.post('/api/session', (req, res) => {
 const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
 
 // Chat endpoint - now with file support
+// Request format: { message: string, sessionId: string, images: Array<{data, mimeType}>, documents: Array<{content, name}> }
+// Note: sessionId is the unique identifier for a chat conversation
+// Images should be base64-encoded data URLs
+// Documents should be text content (PDF, Word, etc. are not supported - use TXT or MD)
 app.post('/api/chat', async (req, res) => {
   const { message, sessionId, images = [], documents = [] } = req.body;
 
@@ -132,8 +136,8 @@ app.post('/api/chat', async (req, res) => {
             base64Data = base64Data.split(',')[1];
           }
           messageParts.push({
-            inlineData: {
-              mimeType: img.mimeType,
+            inline_data: {
+              mime_type: img.mimeType,
               data: base64Data
             }
           });

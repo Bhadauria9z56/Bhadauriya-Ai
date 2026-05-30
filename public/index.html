@@ -819,7 +819,8 @@
                 userMsg.className = 'message-user';
                 const bubble = document.createElement('div');
                 bubble.className = 'message-bubble-user';
-                bubble.textContent = content.message || '📎 Sent files';
+                bubble.textContent = content.message || 'Sent attachments';
+                bubble.setAttribute('aria-label', 'User message with attachments');
                 userMsg.appendChild(bubble);
                 messageGroup.appendChild(userMsg);
 
@@ -878,14 +879,20 @@
         }
 
         function showImageModal(src) {
-            document.getElementById('image-modal-body').innerHTML = `<img src="${src}" style="width: 100%; border-radius: 8px;">`;
+            const modalBody = document.getElementById('image-modal-body');
+            modalBody.innerHTML = ''; // Clear first
+            const img = document.createElement('img');
+            img.src = src;
+            img.style.width = '100%';
+            img.style.borderRadius = '8px';
+            modalBody.appendChild(img);
             imageModal.classList.add('active');
         }
 
         function startVoiceInput() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) {
-                displayMessage('bot', { text: '❌ Speech Recognition is not supported in this browser. Please try using Chrome, Edge, or Safari.' });
+                displayMessage('bot', { text: '❌ Speech Recognition is not supported in this browser. Please try using Chrome or Edge.' });
                 return;
             }
 
@@ -979,7 +986,7 @@
             const chats = JSON.parse(localStorage.getItem('chats') || '[]');
             chatHistory.innerHTML = '';
             
-            chats.reverse().forEach(chat => {
+            [...chats].reverse().forEach(chat => {
                 const item = document.createElement('div');
                 item.className = 'chat-history-item';
                 if (chat.id === currentChatId) item.classList.add('active');
