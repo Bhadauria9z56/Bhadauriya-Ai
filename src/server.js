@@ -11,7 +11,8 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
 // Gemini AI setup
@@ -59,16 +60,31 @@ app.post('/api/session', (req, res) => {
   res.json({ sessionId });
 });
 
-// Chat endpoint
-app.post('/api/chat', async (req, res) => {
-  const { message, sessionId } = req.body;
+// Constants
+const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
 
-  if (!message || !message.trim()) {
-    return res.status(400).json({ error: 'Message required hai' });
+// Chat endpoint - now with file support
+// Request format: { message: string, sessionId: string, images: Array<{data, mimeType}>, documents: Array<{content, name}> }
+// Note: sessionId is the unique identifier for a chat conversation
+// Images should be base64-encoded data URLs
+// Documents should be text content (PDF, Word, etc. are not supported - use TXT or MD)
+app.post('/api/chat', async (req, res) => {
+  const { message, sessionId, images = [], documents = [] } = req.body;
+
+  // Either message or files should exist
+  if ((!message || !message.trim()) && images.length === 0 && documents.length === 0) {
+    return res.status(400).json({ error: 'Message or files required hai' });
   }
 
   if (!process.env.GEMINI_API_KEY) {
     return res.status(500).json({ error: 'GEMINI_API_KEY set nahi hai' });
+  }
+
+  // Validate document sizes
+  for (const doc of documents) {
+    if (doc.content && doc.content.length > MAX_DOCUMENT_SIZE) {
+      return res.status(400).json({ error: `Document "${doc.name}" is too large. Maximum size is 1MB.` });
+    }
   }
 
   // Session get ya banao
@@ -102,12 +118,67 @@ app.post('/api/chat', async (req, res) => {
       }
     });
 
-    const result = await chat.sendMessage(message.trim());
+    // Build message parts - support text + images + documents
+    const messageParts = [];
+
+    // Add text message
+    if (message && message.trim()) {
+      messageParts.push({ text: message.trim() });
+    }
+
+    // Add images as inline_data
+    if (images && images.length > 0) {
+      for (const img of images) {
+        if (img.data && img.mimeType) {
+          // Extract base64 data (remove data:image/... prefix if present)
+          let base64Data = img.data;
+          if (base64Data.includes(',')) {
+            base64Data = base64Data.split(',')[1];
+          }
+          messageParts.push({
+            inline_data: {
+              mime_type: img.mimeType,
+              data: base64Data
+            }
+          });
+        }
+      }
+    }
+
+    // Add documents as text
+    if (documents && documents.length > 0) {
+      for (const doc of documents) {
+        if (doc.content) {
+          messageParts.push({
+            text: `[Document: ${doc.name || 'Unnamed'}]\n${doc.content}`
+          });
+        }
+      }
+    }
+
+    // If no parts, that's an error
+    if (messageParts.length === 0) {
+      return res.status(400).json({ error: 'No valid content to send' });
+    }
+
+    const result = await chat.sendMessage(messageParts);
     const responseText = result.response.text();
 
-    // History update karo
+    // Build user message for history (text only for storage efficiency)
+    const userHistoryParts = [];
+    if (message && message.trim()) {
+      userHistoryParts.push({ text: message.trim() });
+    }
+    if (images && images.length > 0) {
+      userHistoryParts.push({ text: `[User sent ${images.length} image(s)]` });
+    }
+    if (documents && documents.length > 0) {
+      userHistoryParts.push({ text: `[User sent ${documents.length} document(s)]` });
+    }
+
+    // History update karo (userHistoryParts guaranteed to have content due to validation above)
     session.history.push(
-      { role: 'user', parts: [{ text: message.trim() }] },
+      { role: 'user', parts: userHistoryParts },
       { role: 'model', parts: [{ text: responseText }] }
     );
 
