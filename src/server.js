@@ -3,7 +3,7 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const Groq = require('groq-sdk');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -15,8 +15,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Gemini AI setup
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Groq AI setup
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
 
 // In-memory session store
 const sessions = new Map();
@@ -35,8 +35,8 @@ setInterval(() => {
 const SYSTEM_PROMPT = process.env.SYSTEM_PROMPT ||
   'You are Bhadauriya AI, a helpful, intelligent and friendly assistant. Always respond in the same language the user writes in.';
 
-// Model to use - configurable via env
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+// Model to use
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
 
 // Routes
 
@@ -45,7 +45,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     bot: process.env.BOT_NAME || 'Bhadauriya AI',
-    model: GEMINI_MODEL,
+    model: GROQ_MODEL,
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -71,13 +71,12 @@ const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
 app.post('/api/chat', async (req, res) => {
   const { message, sessionId, images = [], documents = [], history = [] } = req.body;
 
-  // Either message or files should exist
   if ((!message || !message.trim()) && images.length === 0 && documents.length === 0) {
     return res.status(400).json({ error: 'Message or files required hai' });
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY set nahi hai. Please configure the API key.' });
+  if (!process.env.GROQ_API_KEY) {
+    return res.status(500).json({ error: 'GROQ_API_KEY set nahi hai. Please configure the API key.' });
   }
 
   // Validate document sizes
@@ -110,65 +109,51 @@ app.post('/api/chat', async (req, res) => {
   session.messageCount++;
 
   try {
-    const model = genAI.getGenerativeModel({
-      model: GEMINI_MODEL,
-      systemInstruction: SYSTEM_PROMPT
-    });
+    // Groq ke liye messages array banao
+    const groqMessages = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...session.history.map(h => ({
+        role: h.role === 'model' ? 'assistant' : 'user',
+        content: h.parts.map(p => p.text).join('\n')
+      }))
+    ];
 
-    const chat = model.startChat({
-      history: session.history,
-      generationConfig: {
-        maxOutputTokens: 2048,
-        temperature: 0.7,
-      }
-    });
-
-    // Build message parts - support text + images + documents
+    // Current message build karo
     const messageParts = [];
 
-    // Add text message
     if (message && message.trim()) {
       messageParts.push({ text: message.trim() });
     }
 
-    // Add images as inline_data
     if (images && images.length > 0) {
-      for (const img of images) {
-        if (img.data && img.mimeType) {
-          let base64Data = img.data;
-          if (base64Data.includes(',')) {
-            base64Data = base64Data.split(',')[1];
-          }
-          messageParts.push({
-            inlineData: {
-              mimeType: img.mimeType,
-              data: base64Data
-            }
-          });
-        }
-      }
+      messageParts.push({ text: `[User sent ${images.length} image(s) - image analysis not supported in text mode]` });
     }
 
-    // Add documents as text
     if (documents && documents.length > 0) {
       for (const doc of documents) {
         if (doc.content) {
-          messageParts.push({
-            text: `[Document: ${doc.name || 'Unnamed'}]\n${doc.content}`
-          });
+          messageParts.push({ text: `[Document: ${doc.name || 'Unnamed'}]\n${doc.content}` });
         }
       }
     }
 
-    // If no parts, that's an error
     if (messageParts.length === 0) {
       return res.status(400).json({ error: 'No valid content to send' });
     }
 
-    const result = await chat.sendMessage(messageParts);
-    const responseText = result.response.text();
+    const currentContent = messageParts.map(p => p.text).join('\n');
+    groqMessages.push({ role: 'user', content: currentContent });
 
-    // Build user message for history (text only for storage efficiency)
+    const completion = await groq.chat.completions.create({
+      messages: groqMessages,
+      model: GROQ_MODEL,
+      max_tokens: 2048,
+      temperature: 0.7,
+    });
+
+    const responseText = completion.choices[0].message.content;
+
+    // History update karo
     const userHistoryParts = [];
     if (message && message.trim()) {
       userHistoryParts.push({ text: message.trim() });
@@ -180,13 +165,12 @@ app.post('/api/chat', async (req, res) => {
       userHistoryParts.push({ text: `[User sent ${documents.length} document(s)]` });
     }
 
-    // History update karo
     session.history.push(
       { role: 'user', parts: userHistoryParts },
       { role: 'model', parts: [{ text: responseText }] }
     );
 
-    // Max 20 turns history rakho (memory management)
+    // Max 40 turns history rakho
     if (session.history.length > 40) {
       session.history = session.history.slice(-40);
     }
@@ -198,16 +182,13 @@ app.post('/api/chat', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Gemini API Error:', error.message);
+    console.error('Groq API Error:', error.message);
 
-    if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key')) {
-      return res.status(401).json({ error: 'Gemini API key invalid hai. Please check your .env file.' });
+    if (error.message?.includes('401') || error.message?.includes('API key')) {
+      return res.status(401).json({ error: 'Groq API key invalid hai. Please check Railway env variables.' });
     }
-    if (error.message?.includes('QUOTA_EXCEEDED') || error.message?.includes('quota')) {
-      return res.status(429).json({ error: 'API quota exceeded. Please try again later.' });
-    }
-    if (error.message?.includes('not found') || error.message?.includes('404')) {
-      return res.status(500).json({ error: `Model "${GEMINI_MODEL}" not found. Please check GEMINI_MODEL in .env` });
+    if (error.message?.includes('429') || error.message?.includes('rate limit')) {
+      return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
     }
 
     res.status(500).json({ error: `Server error: ${error.message}` });
@@ -226,7 +207,7 @@ function normalizeClientHistory(history) {
     }));
 }
 
-// Clear session history
+// Clear session
 app.delete('/api/session/:sessionId', (req, res) => {
   const { sessionId } = req.params;
   if (sessions.has(sessionId)) {
@@ -243,16 +224,16 @@ app.get('/api/stats', (req, res) => {
     activeSessions: sessions.size,
     uptime: Math.floor(process.uptime()),
     botName: process.env.BOT_NAME || 'Bhadauriya AI',
-    model: GEMINI_MODEL
+    model: GROQ_MODEL
   });
 });
 
-// Serve frontend for all other routes
+// Serve frontend
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`✅ Bhadauriya AI running on port ${PORT} | Model: ${GEMINI_MODEL}`);
+  console.log(`✅ Bhadauriya AI running on port ${PORT} | Model: ${GROQ_MODEL}`);
 });
