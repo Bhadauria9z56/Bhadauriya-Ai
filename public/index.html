@@ -776,7 +776,7 @@
         const API_BASE = '/api';
         const PREVIEW_MAX_LENGTH = 50;
         const MAX_DOCUMENT_SIZE = 1024 * 1024; // 1MB
-        const VOICE_CHAT_ERROR_RECOVERY_DELAY_MS = 1500; // Delay before resuming listening after error
+        const VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS = 1500; // Delay in milliseconds before resuming listening after error
         const SPEECH_SYNTHESIS_RATE = 1;
         const SPEECH_SYNTHESIS_PITCH = 1;
         const SPEECH_SYNTHESIS_VOLUME = 1;
@@ -801,7 +801,7 @@
         let voiceChatActive = false;
         let voiceChatRecognition = null;
         let voiceChatSynthesis = window.speechSynthesis;
-        let currentlySpeaking = false;
+        let isSpeaking = false;
         let awaitingUserInput = false;
 
         // DOM Elements
@@ -1033,11 +1033,6 @@
                 const data = await response.json();
                 displayMessage('bot', { text: data.reply });
 
-                // If in voice chat mode, speak the response
-                if (voiceChatActive) {
-                    await speakResponse(data.reply);
-                }
-
                 saveChat(message, images, documents);
             } catch (error) {
                 displayMessage('bot', { text: `Error: ${error.message}` });
@@ -1206,7 +1201,9 @@
             voiceChatRecognition.interimResults = true;
             voiceChatRecognition.lang = 'en-US';
 
-            let finalTranscript = ''; // Reset transcript for this session
+            // finalTranscript persists within this recognition session to accumulate text from multiple
+            // onresult events. It's reset each time startVoiceChatListening() is called (new session).
+            let finalTranscript = '';
 
             voiceChatRecognition.onstart = () => {
                 updateVoiceChatStatus('Listening...');
@@ -1251,18 +1248,19 @@
             voiceChatRecognition.onerror = (event) => {
                 console.error('Voice chat recognition error:', event.error);
                 if (voiceChatActive) {
-                    if (event.error !== 'no-speech') {
+                    // Only show error and recover for non-'no-speech' errors
+                    const shouldRecoverFromError = event.error !== 'no-speech';
+                    
+                    if (shouldRecoverFromError) {
                         const userMessage = VOICE_CHAT_ERROR_MESSAGES[event.error] || VOICE_CHAT_ERROR_MESSAGES['default'];
                         updateVoiceChatStatus(`Error: ${userMessage}`);
-                    }
-                    
-                    // Automatically recover from error by resuming listening after a delay
-                    if (event.error !== 'no-speech') {
+                        
+                        // Automatically recover from error by resuming listening after a delay
                         setTimeout(() => {
                             if (voiceChatActive) {
                                 startVoiceChatListening();
                             }
-                        }, VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
+                        }, VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS);
                     }
                 }
             };
@@ -1298,7 +1296,7 @@
                     
                     // Resume listening after error
                     if (voiceChatActive) {
-                        setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
+                        setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS);
                     }
                     return;
                 }
@@ -1331,7 +1329,7 @@
 
                 // Resume listening after error
                 if (voiceChatActive) {
-                    setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MS);
+                    setTimeout(() => startVoiceChatListening(), VOICE_CHAT_ERROR_RECOVERY_DELAY_MILLISECONDS);
                 }
             }
         }
@@ -1342,7 +1340,8 @@
             text = text.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove bold (**)
             text = text.replace(/__(.*?)__/g, '$1'); // Remove bold (__)
             text = text.replace(/\*(.*?)\*/g, '$1'); // Remove italic (*)
-            text = text.replace(/_(.*?)_/g, '$1'); // Remove italic (_)
+            // For underscores, only remove when they're emphasis markers (surrounded by spaces or at boundaries)
+            text = text.replace(/(^|\s)_(.*?)_($|\s)/g, '$1$2$3'); // Remove italic (_) with word boundaries
             text = text.replace(/~~(.*?)~~/g, '$1'); // Remove strikethrough
             text = text.replace(/`(.*?)`/g, '$1'); // Remove inline code
             text = text.replace(/```[\s\S]*?```/g, ''); // Remove code blocks
@@ -1363,12 +1362,13 @@
                 // Stop listening while speaking
                 if (voiceChatRecognition) {
                     voiceChatRecognition.abort();
-                    // Don't set to null immediately to avoid issues with pending callbacks
+                    // Don't set to null immediately: the onend/onerror handlers may still be pending
+                    // and could throw errors if the object is nullified before they execute
                 }
 
                 updateVoiceChatStatus('Speaking...');
                 updateWaveformState('speaking');
-                currentlySpeaking = true;
+                isSpeaking = true;
 
                 const utterance = new SpeechSynthesisUtterance(cleanText);
                 utterance.rate = SPEECH_SYNTHESIS_RATE;
@@ -1377,29 +1377,36 @@
                 utterance.lang = 'en-US';
 
                 // Try to use a natural voice - attempt multiple fallback options
-                // Voices may load asynchronously, so we check available voices
                 const voices = voiceChatSynthesis.getVoices();
                 if (voices.length > 0) {
-                    // Preference order: Google voices > system default English > first English voice > first available
-                    const preferredVoice = 
-                        voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) ||
-                        voices.find(v => v.lang.startsWith('en') && v.default) ||
-                        voices.find(v => v.lang.startsWith('en')) ||
-                        voices[0];
+                    // Select voice with preference order: Google > first English > first available
+                    let selectedVoice = null;
+                    for (const voice of voices) {
+                        if (voice.name.includes('Google') && voice.lang.startsWith('en')) {
+                            selectedVoice = voice;
+                            break; // Highest priority, stop searching
+                        }
+                        if (!selectedVoice && voice.lang.startsWith('en')) {
+                            selectedVoice = voice; // Remember first English voice
+                        }
+                        if (!selectedVoice) {
+                            selectedVoice = voice; // Remember first available as fallback
+                        }
+                    }
                     
-                    if (preferredVoice) {
-                        utterance.voice = preferredVoice;
+                    if (selectedVoice) {
+                        utterance.voice = selectedVoice;
                     }
                 }
 
                 utterance.onend = () => {
-                    currentlySpeaking = false;
+                    isSpeaking = false;
                     resolve();
                 };
 
                 utterance.onerror = (event) => {
                     console.error('Speech synthesis error:', event.error);
-                    currentlySpeaking = false;
+                    isSpeaking = false;
                     resolve();
                 };
 
@@ -1433,7 +1440,7 @@
 
             // Cancel speech
             voiceChatSynthesis.cancel();
-            currentlySpeaking = false;
+            isSpeaking = false;
 
             // Hide modal
             voiceChatModal.classList.remove('active');
