@@ -1380,6 +1380,7 @@
 
     // ── DISPLAY HELPERS ──
     function clearEmptyState() {
+        // Remove empty state element (direct child of chat-area, sibling to messages-wrapper)
         const es = chatAreaEl.querySelector('.empty-state');
         if (es) es.remove();
         chatAreaEl.classList.remove('empty');
