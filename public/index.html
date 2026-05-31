@@ -1516,13 +1516,13 @@
         // Clear any existing messages
         messagesEl.innerHTML = '';
 
-        // Create and insert empty state as a sibling to messages-wrapper
-        let emptyState = chatAreaEl.querySelector('.empty-state');
-        if (!emptyState) {
-            emptyState = document.createElement('div');
-            emptyState.className = 'empty-state';
-            chatAreaEl.appendChild(emptyState);
-        }
+        // Remove any existing empty state
+        const existingEmpty = chatAreaEl.querySelector('.empty-state');
+        if (existingEmpty) existingEmpty.remove();
+
+        // Create fresh empty state element
+        const emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
         emptyState.innerHTML = `
             <div class="empty-glow-ring">✦</div>
             <div>
@@ -1535,6 +1535,7 @@
                 <button class="empty-chip" onclick="prefill('Summarize the key points of my document')">Summarize a document</button>
                 <button class="empty-chip" onclick="prefill('What are the best practices for REST APIs?')">REST API tips</button>
             </div>`;
+        chatAreaEl.appendChild(emptyState);
         chatAreaEl.classList.add('empty');
     }
 
