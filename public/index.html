@@ -1513,6 +1513,9 @@
     }
 
     function renderEmptyState() {
+        // Clear any existing messages
+        messagesEl.innerHTML = '';
+         
         // Create and insert empty state as a sibling to messages-wrapper
         let emptyState = chatAreaEl.querySelector('.empty-state');
         if (!emptyState) {
@@ -1846,11 +1849,11 @@
         selectedImages = []; selectedDocs = [];
         updateAttachPreview();
         updateSendBtn();
-        messagesEl.innerHTML = '';
 
         if (!chat.messages?.length) {
             renderEmptyState();
         } else {
+            messagesEl.innerHTML = '';
             clearEmptyState();
             chat.messages.forEach(m => {
                 if (m.role === 'user') displayUserMessage(m.content);
