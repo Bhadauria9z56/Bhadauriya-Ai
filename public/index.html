@@ -328,7 +328,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: flex-end;
             overflow: hidden;
+        }
+
+        .chat-area.empty {
+            justify-content: center;
         }
 
         .messages-wrapper {
@@ -432,20 +437,6 @@
             background: var(--accent-subtle);
             border-color: var(--border-accent);
             color: #c4b5fd;
-        }
-
-        /* ── CENTERED INPUT LAYOUT ── */
-        .chat-area.centered-input {
-            justify-content: center;
-        }
-
-        .chat-area.centered-input .messages-wrapper {
-            flex: 0;
-        }
-
-        .chat-area.centered-input + .input-area {
-            position: relative;
-            margin-top: 20px;
         }
 
         /* ── MESSAGES ── */
@@ -1389,9 +1380,10 @@
 
     // ── DISPLAY HELPERS ──
     function clearEmptyState() {
-        const es = messagesEl.querySelector('.empty-state');
+        // Remove empty state element (direct child of chat-area, sibling to messages-wrapper)
+        const es = chatAreaEl.querySelector('.empty-state');
         if (es) es.remove();
-        chatAreaEl.classList.remove('centered-input');
+        chatAreaEl.classList.remove('empty');
     }
 
     function showTyping() {
@@ -1522,21 +1514,26 @@
     }
 
     function renderEmptyState() {
-        messagesEl.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-glow-ring">✦</div>
-                <div>
-                    <div class="empty-title">How can I help you?</div>
-                    <p class="empty-subtitle" style="margin-top:8px">Ask me anything — I can help with coding, writing, analysis, and more.</p>
-                </div>
-                <div class="empty-chips">
-                    <button class="empty-chip" onclick="prefill('Explain how neural networks work')">Explain neural networks</button>
-                    <button class="empty-chip" onclick="prefill('Write a Python function to sort a list')">Write Python code</button>
-                    <button class="empty-chip" onclick="prefill('Summarize the key points of my document')">Summarize a document</button>
-                    <button class="empty-chip" onclick="prefill('What are the best practices for REST APIs?')">REST API tips</button>
-                </div>
+        // Clear any existing messages (empty state should already be cleared by caller)
+        messagesEl.innerHTML = '';
+
+        // Create fresh empty state element
+        const emptyState = document.createElement('div');
+        emptyState.className = 'empty-state';
+        emptyState.innerHTML = `
+            <div class="empty-glow-ring">✦</div>
+            <div>
+                <div class="empty-title">How can I help you?</div>
+                <p class="empty-subtitle" style="margin-top:8px">Ask me anything — I can help with coding, writing, analysis, and more.</p>
+            </div>
+            <div class="empty-chips">
+                <button class="empty-chip" onclick="prefill('Explain how neural networks work')">Explain neural networks</button>
+                <button class="empty-chip" onclick="prefill('Write a Python function to sort a list')">Write Python code</button>
+                <button class="empty-chip" onclick="prefill('Summarize the key points of my document')">Summarize a document</button>
+                <button class="empty-chip" onclick="prefill('What are the best practices for REST APIs?')">REST API tips</button>
             </div>`;
-       chatAreaEl.classList.add('centered-input');
+        chatAreaEl.appendChild(emptyState);
+        chatAreaEl.classList.add('empty');
     }
 
     function prefill(text) {
@@ -1839,6 +1836,7 @@
         selectedImages = []; selectedDocs = [];
         updateAttachPreview();
         updateSendBtn();
+        clearEmptyState();
         renderEmptyState();
         renderChatHistory();
     }
@@ -1850,12 +1848,14 @@
         selectedImages = []; selectedDocs = [];
         updateAttachPreview();
         updateSendBtn();
+
+        // Clear previous messages and empty state
         messagesEl.innerHTML = '';
+        clearEmptyState();
 
         if (!chat.messages?.length) {
             renderEmptyState();
         } else {
-            chatAreaEl.classList.remove('centered-input');
             chat.messages.forEach(m => {
                 if (m.role === 'user') displayUserMessage(m.content);
                 else addBotMessage(m.content?.text || '', m.content?.error);
