@@ -1848,12 +1848,14 @@
         selectedImages = []; selectedDocs = [];
         updateAttachPreview();
         updateSendBtn();
+         
+        // Clear previous messages and empty state
+        messagesEl.innerHTML = '';
+        clearEmptyState();
 
         if (!chat.messages?.length) {
             renderEmptyState();
         } else {
-            clearEmptyState();
-            messagesEl.innerHTML = '';
             chat.messages.forEach(m => {
                 if (m.role === 'user') displayUserMessage(m.content);
                 else addBotMessage(m.content?.text || '', m.content?.error);
