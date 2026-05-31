@@ -1514,9 +1514,8 @@
     }
 
     function renderEmptyState() {
-        // Clear any existing messages and empty state
+        // Clear any existing messages (empty state should already be cleared by caller)
         messagesEl.innerHTML = '';
-        clearEmptyState();
 
         // Create fresh empty state element
         const emptyState = document.createElement('div');
@@ -1837,6 +1836,7 @@
         selectedImages = []; selectedDocs = [];
         updateAttachPreview();
         updateSendBtn();
+        clearEmptyState();
         renderEmptyState();
         renderChatHistory();
     }
