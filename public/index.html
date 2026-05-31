@@ -1855,6 +1855,7 @@
         if (!chat.messages?.length) {
             renderEmptyState();
         } else {
+            chatAreaEl.classList.remove('centered-input');
             chat.messages.forEach(m => {
                 if (m.role === 'user') displayUserMessage(m.content);
                 else addBotMessage(m.content?.text || '', m.content?.error);
