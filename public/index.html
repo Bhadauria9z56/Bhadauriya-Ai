@@ -1515,7 +1515,7 @@
     function renderEmptyState() {
         // Clear any existing messages
         messagesEl.innerHTML = '';
-         
+
         // Create and insert empty state as a sibling to messages-wrapper
         let emptyState = chatAreaEl.querySelector('.empty-state');
         if (!emptyState) {
@@ -1535,7 +1535,7 @@
                 <button class="empty-chip" onclick="prefill('Summarize the key points of my document')">Summarize a document</button>
                 <button class="empty-chip" onclick="prefill('What are the best practices for REST APIs?')">REST API tips</button>
             </div>`;
-       chatAreaEl.classList.add('empty');
+        chatAreaEl.classList.add('empty');
     }
 
     function prefill(text) {
