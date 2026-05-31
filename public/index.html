@@ -1513,8 +1513,10 @@
     }
 
     function renderEmptyState() {
-        // Clear any existing messages
+        // Clear any existing messages and empty state
         messagesEl.innerHTML = '';
+        const existingEmpty = chatAreaEl.querySelector('.empty-state');
+        if (existingEmpty) existingEmpty.remove();
 
         // Create fresh empty state element
         const emptyState = document.createElement('div');
@@ -1848,11 +1850,10 @@
         updateSendBtn();
 
         if (!chat.messages?.length) {
-            clearEmptyState();
             renderEmptyState();
         } else {
-            messagesEl.innerHTML = '';
             clearEmptyState();
+            messagesEl.innerHTML = '';
             chat.messages.forEach(m => {
                 if (m.role === 'user') displayUserMessage(m.content);
                 else addBotMessage(m.content?.text || '', m.content?.error);
