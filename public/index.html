@@ -1381,8 +1381,8 @@
 
     // ── DISPLAY HELPERS ──
     function clearEmptyState() {
-        // Remove empty state element (direct child of chat-area, sibling to messages-wrapper)
-        const es = chatAreaEl.querySelector('.empty-state');
+        // Remove empty state element (now inside messages-wrapper)
+        const es = messagesEl.querySelector('.empty-state');
         if (es) es.remove();
         chatAreaEl.classList.remove('empty');
     }
@@ -1533,7 +1533,7 @@
                 <button class="empty-chip" onclick="prefill('Summarize the key points of my document')">Summarize a document</button>
                 <button class="empty-chip" onclick="prefill('What are the best practices for REST APIs?')">REST API tips</button>
             </div>`;
-        chatAreaEl.appendChild(emptyState);
+        messagesEl.appendChild(emptyState);
         chatAreaEl.classList.add('empty');
     }
 
