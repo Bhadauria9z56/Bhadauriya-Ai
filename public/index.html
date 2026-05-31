@@ -1516,10 +1516,6 @@
         // Clear any existing messages
         messagesEl.innerHTML = '';
 
-        // Remove any existing empty state
-        const existingEmpty = chatAreaEl.querySelector('.empty-state');
-        if (existingEmpty) existingEmpty.remove();
-
         // Create fresh empty state element
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
@@ -1852,6 +1848,7 @@
         updateSendBtn();
 
         if (!chat.messages?.length) {
+            clearEmptyState();
             renderEmptyState();
         } else {
             messagesEl.innerHTML = '';
