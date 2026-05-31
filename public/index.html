@@ -1516,8 +1516,7 @@
     function renderEmptyState() {
         // Clear any existing messages and empty state
         messagesEl.innerHTML = '';
-        const existingEmpty = chatAreaEl.querySelector('.empty-state');
-        if (existingEmpty) existingEmpty.remove();
+        clearEmptyState();
 
         // Create fresh empty state element
         const emptyState = document.createElement('div');
