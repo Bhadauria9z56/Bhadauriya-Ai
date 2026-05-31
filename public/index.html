@@ -1328,6 +1328,8 @@
         const text = inputBox.value.trim();
         if (!text && !selectedImages.length && !selectedDocs.length) return;
 
+        console.log('Sending images:', selectedImages.length);
+
         const images = [...selectedImages];
         const documents = [...selectedDocs];
         const userContent = { message: text, images, documents };
