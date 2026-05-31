@@ -434,6 +434,20 @@
             color: #c4b5fd;
         }
 
+        /* ── CENTERED INPUT LAYOUT ── */
+        .chat-area.centered-input {
+            justify-content: center;
+        }
+
+        .chat-area.centered-input .messages-wrapper {
+            flex: 0;
+        }
+
+        .chat-area.centered-input + .input-area {
+            position: relative;
+            margin-top: 20px;
+        }
+
         /* ── MESSAGES ── */
         .message-group {
             display: flex;
@@ -1145,6 +1159,7 @@
 
     // ── DOM ──
     const messagesEl = document.getElementById('messages-wrapper');
+    const chatAreaEl = document.querySelector('.chat-area');
     const inputBox = document.getElementById('input-box');
     const sendBtn = document.getElementById('send-btn');
     const attachImgBtn = document.getElementById('attach-image-btn');
@@ -1376,6 +1391,7 @@
     function clearEmptyState() {
         const es = messagesEl.querySelector('.empty-state');
         if (es) es.remove();
+        chatAreaEl.classList.remove('centered-input');
     }
 
     function showTyping() {
@@ -1520,6 +1536,7 @@
                     <button class="empty-chip" onclick="prefill('What are the best practices for REST APIs?')">REST API tips</button>
                 </div>
             </div>`;
+       chatAreaEl.classList.add('centered-input');
     }
 
     function prefill(text) {
